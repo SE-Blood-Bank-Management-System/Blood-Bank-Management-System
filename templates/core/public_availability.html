@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}Public Blood Availability - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="bi bi-search text-danger me-2"></i>Public Blood Availability</h2>
+      <p class="text-muted mb-0">Current blood unit counts by ABO/Rh group across blood bank facilities (SRS BBMS-F-067)</p>
+    </div>
+    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill">
+      <i class="bi bi-shield-check me-1"></i>Privacy Compliant &bull; No PII (SRS BBMS-F-068)
+    </span>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" class="ps-4">Blood Group</th>
+              <th scope="col">Available Units</th>
+              <th scope="col">Stock Status</th>
+              <th scope="col">Eligible Donors Can Help</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in inventory_summary %}
+              <tr>
+                <td class="ps-4">
+                  <span class="blood-badge">{{ item.blood_group }}</span>
+                </td>
+                <td class="fw-bold fs-5">{{ item.units }} units</td>
+                <td>
+                  {% if item.status == 'Critical' %}
+                    <span class="badge bg-danger">Critical Need</span>
+                  {% elif item.status == 'Low' %}
+                    <span class="badge bg-warning text-dark">Low Stock</span>
+                  {% else %}
+                    <span class="badge bg-success">Adequate</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.status == 'Critical' or item.status == 'Low' %}
+                    <a href="{% url 'accounts:register_donor' %}" class="btn btn-sm btn-outline-danger">Donate Now</a>
+                  {% else %}
+                    <span class="text-muted small">Walk-ins welcomed</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-secondary d-flex align-items-center gap-2 small" role="alert">
+    <i class="bi bi-info-circle-fill fs-5"></i>
+    <div>
+      <strong>Note:</strong> Quarantined, untested, and expired blood units are automatically excluded from public availability figures per SRS BBMS-F-028 &amp; BBMS-F-039.
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% load static %}
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'core:home' %}">
+      <span class="drop-icon"><i class="bi bi-droplet-fill"></i></span>
+      <span>BBMS</span>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+            aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarContent">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'core:home' %}">
+            <i class="bi bi-house-door me-1"></i>Home
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'core:public_availability' %}">
+            <i class="bi bi-search me-1"></i>Blood Availability
+          </a>
+        </li>
+
+        {# ================= ROLE-AWARE NAVIGATION ================= #}
+        {% if user.is_authenticated %}
+          {% if user.role == 'DONOR' %}
+            {# Donor Role Navigation #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'donors:dashboard' %}">
+                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'appointments:book' %}">
+                <i class="bi bi-calendar-plus me-1"></i>Book Appointment
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'appointments:list' %}">
+                <i class="bi bi-calendar-check me-1"></i>My Appointments
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'donors:history' %}">
+                <i class="bi bi-clock-history me-1"></i>Donation History
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'donors:eligibility' %}">
+                <i class="bi bi-card-checklist me-1"></i>Eligibility
+              </a>
+            </li>
+
+          {% elif user.role == 'STAFF' %}
+            {# Blood Bank Staff Role Navigation #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:dashboard' %}">
+                <i class="bi bi-box-seam me-1"></i>Inventory
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:quarantine' %}">
+                <i class="bi bi-shield-exclamation me-1"></i>Quarantine & Serology
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'appointments:list' %}">
+                <i class="bi bi-calendar3 me-1"></i>Appointments
+              </a>
+            </li>
+
+          {% elif user.role == 'ADMIN' or user.is_superuser %}
+            {# Administrator Role Navigation #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:dashboard' %}">
+                <i class="bi bi-box-seam me-1"></i>Inventory
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:quarantine' %}">
+                <i class="bi bi-shield-check me-1"></i>Testing & Quarantine
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/admin/">
+                <i class="bi bi-gear-fill me-1"></i>Admin Panel
+              </a>
+            </li>
+
+          {% elif user.role == 'HOSPITAL' %}
+            {# Hospital User Navigation #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'core:public_availability' %}">
+                <i class="bi bi-hospital me-1"></i>Hospital Portal
+              </a>
+            </li>
+          {% endif %}
+        {% endif %}
+
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'core:about' %}">
+            <i class="bi bi-info-circle me-1"></i>About
+          </a>
+        </li>
+      </ul>
+
+      {# Right-aligned Authentication & User Controls #}
+      <ul class="navbar-nav ms-auto align-items-lg-center">
+        {% if user.is_authenticated %}
+          <li class="nav-item me-2 mb-2 mb-lg-0">
+            {% if user.role == 'DONOR' %}
+              <span class="badge bg-danger text-white role-badge"><i class="bi bi-person-heart me-1"></i>Donor</span>
+            {% elif user.role == 'STAFF' %}
+              <span class="badge bg-primary text-white role-badge"><i class="bi bi-clipboard2-pulse me-1"></i>Staff</span>
+            {% elif user.role == 'ADMIN' or user.is_superuser %}
+              <span class="badge bg-dark text-white role-badge"><i class="bi bi-shield-lock me-1"></i>Administrator</span>
+            {% elif user.role == 'HOSPITAL' %}
+              <span class="badge bg-success text-white role-badge"><i class="bi bi-hospital me-1"></i>Hospital</span>
+            {% endif %}
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle d-flex align-items-center gap-1" href="#" id="userMenuDropdown"
+               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle fs-5"></i>
+              <span>{{ user.username }}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userMenuDropdown">
+              <li>
+                <div class="px-3 py-1 text-muted small">
+                  Signed in as<br><strong>{{ user.get_full_name|default:user.username }}</strong>
+                </div>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                  <i class="bi bi-person me-2"></i>My Profile
+                </a>
+              </li>
+              {% if user.role == 'DONOR' %}
+                <li>
+                  <a class="dropdown-item" href="{% url 'donors:dashboard' %}">
+                    <i class="bi bi-speedometer2 me-2"></i>Donor Dashboard
+                  </a>
+                </li>
+              {% elif user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
+                <li>
+                  <a class="dropdown-item" href="{% url 'inventory:dashboard' %}">
+                    <i class="bi bi-boxes me-2"></i>Inventory Manager
+                  </a>
+                </li>
+              {% endif %}
+              {% if user.is_superuser or user.role == 'ADMIN' %}
+                <li>
+                  <a class="dropdown-item" href="/admin/">
+                    <i class="bi bi-sliders me-2"></i>Django Administration
+                  </a>
+                </li>
+              {% endif %}
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item text-danger" href="{% url 'accounts:logout' %}">
+                  <i class="bi bi-box-arrow-right me-2"></i>Logout
+                </a>
+              </li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:login' %}">
+              <i class="bi bi-box-arrow-in-right me-1"></i>Login
+            </a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="btn btn-outline-danger btn-sm dropdown-toggle ms-lg-2 mt-2 mt-lg-0" href="#" id="registerDropdown"
+               role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-plus me-1"></i>Register
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="registerDropdown">
+              <li>
+                <a class="dropdown-item" href="{% url 'accounts:register_donor' %}">
+                  <i class="bi bi-heart me-2 text-danger"></i>Register as Donor
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{% url 'accounts:register_hospital' %}">
+                  <i class="bi bi-hospital me-2 text-primary"></i>Register Hospital
+                </a>
+              </li>
+            </ul>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>

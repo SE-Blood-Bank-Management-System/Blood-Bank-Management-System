@@ -1,0 +1,106 @@
+/* Blood Bank Management System (BBMS) - Global Stylesheet */
+:root {
+  --primary-red: #c92a2a;
+  --primary-red-hover: #b02525;
+  --secondary-crimson: #a61e4d;
+  --accent-light: #fff5f5;
+  --dark-slate: #212529;
+  --light-gray: #f8f9fa;
+  --border-color: #dee2e6;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #fdfdfd;
+  color: #333333;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+/* Navbar */
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--primary-red) !important;
+}
+
+.navbar-brand .drop-icon {
+  font-size: 1.3rem;
+  color: var(--primary-red);
+}
+
+.nav-link {
+  font-weight: 500;
+  transition: color 0.15s ease-in-out;
+}
+
+.nav-link:hover {
+  color: var(--primary-red) !important;
+}
+
+.role-badge {
+  font-size: 0.75rem;
+  padding: 0.35em 0.65em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+/* Hero Section */
+.hero-section {
+  background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%);
+  border-bottom: 1px solid #ffc9c9;
+  padding: 4rem 1rem;
+}
+
+/* Feature Cards */
+.feature-card {
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: #ffffff;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.06);
+}
+
+.card-icon {
+  width: 3rem;
+  height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background-color: var(--accent-light);
+  color: var(--primary-red);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Blood Group Pill */
+.blood-badge {
+  display: inline-block;
+  min-width: 55px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--accent-light);
+  color: var(--primary-red);
+  border: 1px solid #ffc9c9;
+  text-align: center;
+}
+
+/* Footer */
+footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background-color: #ffffff;
+}

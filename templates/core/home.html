@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - Blood Bank Management System (BBMS){% endblock %}
+
+{% block content %}
+<div class="container">
+  <!-- Hero Section -->
+  <div class="p-5 mb-4 bg-white rounded-3 shadow-sm border border-light">
+    <div class="container-fluid py-3">
+      <div class="row align-items-center">
+        <div class="col-lg-8">
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 rounded-pill mb-3">
+            <i class="bi bi-heart-pulse-fill me-1"></i>University Software Engineering Project &bull; Team T9
+          </span>
+          <h1 class="display-5 fw-bold text-dark">Blood Bank Management System</h1>
+          <p class="col-md-10 fs-5 text-muted">
+            A comprehensive, modular web application managing the complete blood-banking lifecycle:
+            donor registration, screening, collection, serology testing, FEFO inventory tracking, and emergency hospital requisitions.
+          </p>
+          <div class="d-flex flex-wrap gap-2 mt-4">
+            <a href="{% url 'core:public_availability' %}" class="btn btn-danger btn-lg px-4">
+              <i class="bi bi-search me-1"></i>Check Blood Availability
+            </a>
+            {% if not user.is_authenticated %}
+              <a href="{% url 'accounts:register_donor' %}" class="btn btn-outline-danger btn-lg px-4">
+                <i class="bi bi-person-heart me-1"></i>Register as Donor
+              </a>
+              <a href="{% url 'accounts:login' %}" class="btn btn-outline-secondary btn-lg px-4">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+              </a>
+            {% else %}
+              {% if user.role == 'DONOR' %}
+                <a href="{% url 'donors:dashboard' %}" class="btn btn-outline-danger btn-lg px-4">
+                  <i class="bi bi-speedometer2 me-1"></i>Go to Donor Dashboard
+                </a>
+              {% elif user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
+                <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-primary btn-lg px-4">
+                  <i class="bi bi-box-seam me-1"></i>Manage Inventory
+                </a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-lg-4 text-center mt-4 mt-lg-0">
+          <div class="p-4 bg-light rounded-4 border">
+            <div class="display-1 text-danger mb-2">
+              <i class="bi bi-droplet-half"></i>
+            </div>
+            <h5 class="fw-bold mb-1">Standard 8 Blood Groups</h5>
+            <div class="d-flex flex-wrap justify-content-center gap-1 mt-3">
+              <span class="blood-badge">A+</span>
+              <span class="blood-badge">A-</span>
+              <span class="blood-badge">B+</span>
+              <span class="blood-badge">B-</span>
+              <span class="blood-badge">AB+</span>
+              <span class="blood-badge">AB-</span>
+              <span class="blood-badge">O+</span>
+              <span class="blood-badge">O-</span>
+            </div>
+            <small class="text-muted d-block mt-3">FEFO-governed &amp; Serology-screened</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role Modules Grid -->
+  <div class="row g-4 py-2">
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 feature-card p-3 shadow-sm">
+        <div class="card-body">
+          <div class="card-icon"><i class="bi bi-person-heart"></i></div>
+          <h5 class="card-title fw-bold">Donor Management</h5>
+          <p class="card-text text-muted small">
+            Registration, eligibility questionnaire screening (SRS 4.3), appointment scheduling with slot capacity, and donation history.
+          </p>
+          <a href="{% url 'donors:dashboard' %}" class="btn btn-sm btn-outline-danger mt-2">Explore Module &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 feature-card p-3 shadow-sm">
+        <div class="card-body">
+          <div class="card-icon"><i class="bi bi-shield-check"></i></div>
+          <h5 class="card-title fw-bold">Testing & Quarantine</h5>
+          <p class="card-text text-muted small">
+            Mandatory serology testing (HIV, Hep B/C, Syphilis), quarantine tracking, component separation (RBC, Plasma, Platelets).
+          </p>
+          <a href="{% url 'inventory:quarantine' %}" class="btn btn-sm btn-outline-danger mt-2">Explore Module &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 feature-card p-3 shadow-sm">
+        <div class="card-body">
+          <div class="card-icon"><i class="bi bi-box-seam"></i></div>
+          <h5 class="card-title fw-bold">Inventory & FEFO</h5>
+          <p class="card-text text-muted small">
+            Real-time multi-location tracking, First-Expiry-First-Out (FEFO) ordering, automatic expiry handling, and unique Bag ID tracking.
+          </p>
+          <a href="{% url 'inventory:dashboard' %}" class="btn btn-sm btn-outline-danger mt-2">Explore Module &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+      <div class="card h-100 feature-card p-3 shadow-sm">
+        <div class="card-body">
+          <div class="card-icon"><i class="bi bi-hospital"></i></div>
+          <h5 class="card-title fw-bold">Hospital & Requisitions</h5>
+          <p class="card-text text-muted small">
+            Hospital requisition workflow, STAT emergency priority handling, ABO/Rh cross-matching, dispatch, and delivery confirmation.
+          </p>
+          <a href="{% url 'core:public_availability' %}" class="btn btn-sm btn-outline-danger mt-2">Explore Module &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

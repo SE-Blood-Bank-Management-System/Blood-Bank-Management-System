@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Book Appointment - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm p-4">
+        <h3 class="fw-bold mb-2"><i class="bi bi-calendar-plus text-danger me-2"></i>Book Blood Donation Appointment</h3>
+        <p class="text-muted small">Select an available blood center location, date, and time slot (SRS BBMS-F-012, BBMS-F-013)</p>
+        <hr>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select Blood Bank Location</label>
+            <select name="location" class="form-select" required>
+              <option value="">-- Choose a location --</option>
+              {% for loc in locations %}
+                <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.address }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Donation Date</label>
+              <input type="date" name="date" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Time Slot</label>
+              <select name="slot" class="form-select" required>
+                <option value="">-- Select time slot --</option>
+                {% for slot in slots %}
+                  <option value="{{ slot }}">{{ slot }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="alert alert-light border small text-muted mb-4">
+            <i class="bi bi-info-circle me-1"></i>Slot capacity limits are enforced automatically per SRS BBMS-F-013. You can reschedule or cancel up to 24 hours prior.
+          </div>
+
+          <div class="d-flex justify-content-between">
+            <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-danger">Confirm Appointment Booking</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Register as Donor - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4 p-md-5">
+          <div class="text-center mb-4">
+            <span class="text-danger fs-1"><i class="bi bi-heart-pulse"></i></span>
+            <h3 class="fw-bold mt-2">Donor Registration</h3>
+            <p class="text-muted small">Register to book blood donation appointments and save lives (SRS 4.1)</p>
+          </div>
+
+          <form method="post" action="{% url 'accounts:register_donor' %}">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">First Name</label>
+                <input type="text" name="first_name" class="form-control" placeholder="John" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Last Name</label>
+                <input type="text" name="last_name" class="form-control" placeholder="Doe" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Email Address (Username)</label>
+                <input type="email" name="email" class="form-control" placeholder="john.doe@example.com" required>
+                <div class="form-text">Must be a unique email per donor account (SRS BBMS-F-003).</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Date of Birth</label>
+                <input type="date" name="dob" class="form-control" required>
+                <div class="form-text">Must be at least 18 years old (SRS BBMS-F-002).</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Contact Phone</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Gender</label>
+                <select name="gender" class="form-select" required>
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Self-Reported Blood Group</label>
+                <select name="blood_group" class="form-select">
+                  <option value="">Unknown / Not sure</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Choose a secure password" required>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <button type="submit" class="btn btn-danger w-100 py-2 fw-semibold">
+                <i class="bi bi-person-check me-1"></i>Create Donor Account
+              </button>
+            </div>
+          </form>
+
+          <div class="text-center mt-3">
+            <span class="text-muted small">Already registered? </span>
+            <a href="{% url 'accounts:login' %}" class="small text-danger fw-semibold text-decoration-none">Sign in here</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
