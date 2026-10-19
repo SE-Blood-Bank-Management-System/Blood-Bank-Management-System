@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Register Hospital - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4 p-md-5">
+          <div class="text-center mb-4">
+            <span class="text-primary fs-1"><i class="bi bi-hospital"></i></span>
+            <h3 class="fw-bold mt-2">Hospital Registration</h3>
+            <p class="text-muted small">Register healthcare institutions for blood requisitions (SRS 4.13)</p>
+          </div>
+
+          <div class="alert alert-warning small d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-shield-lock-fill fs-5"></i>
+            <div>
+              <strong>Notice:</strong> Hospital accounts require administrator approval before activation (SRS BBMS-F-040, BBMS-F-042).
+            </div>
+          </div>
+
+          <form method="post" action="{% url 'accounts:register_hospital' %}">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label fw-semibold">Hospital Name</label>
+                <input type="text" name="hospital_name" class="form-control" placeholder="City General Hospital" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Registration / License Number</label>
+                <input type="text" name="license_number" class="form-control" placeholder="REG-HOSP-2026-981" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Official Hospital Email (Username)</label>
+                <input type="email" name="email" class="form-control" placeholder="bloodbank@cityhospital.org" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Contact Person</label>
+                <input type="text" name="contact_person" class="form-control" placeholder="Dr. S. Sharma" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Emergency Phone</label>
+                <input type="tel" name="phone" class="form-control" placeholder="+91 80 2345 6789" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Hospital Address</label>
+                <textarea name="address" class="form-control" rows="2" placeholder="Facility address, city, pin code" required></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+                <i class="bi bi-send me-1"></i>Submit Registration for Approval
+              </button>
+            </div>
+          </form>
+
+          <div class="text-center mt-3">
+            <span class="text-muted small">Already approved? </span>
+            <a href="{% url 'accounts:login' %}" class="small text-primary fw-semibold text-decoration-none">Sign in here</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

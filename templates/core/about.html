@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}About - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card shadow-sm border-0 p-4 mb-4">
+        <h2 class="fw-bold mb-3"><i class="bi bi-info-circle text-danger me-2"></i>About Blood Bank Management System (BBMS)</h2>
+        <p class="lead text-muted">
+          Software Engineering Mini-Project &bull; Deliverable Part 1 &bull; Team T9
+        </p>
+        <hr>
+
+        <h4 class="fw-bold mt-3">Project Overview</h4>
+        <p>
+          BBMS is a modern web application engineered to manage critical blood-banking workflows.
+          From initial donor registration and pre-donation medical eligibility screening, to collection,
+          mandatory serology/infection testing (HIV, Hepatitis B/C, Syphilis), component separation,
+          First-Expiry-First-Out (FEFO) inventory management, hospital requisitions (including STAT emergency priority),
+          compatibility cross-matching, and delivery tracking.
+        </p>
+
+        <h4 class="fw-bold mt-4">Authors & Team T9</h4>
+        <div class="row g-3 mt-1">
+          <div class="col-md-6 col-lg-3">
+            <div class="p-3 border rounded bg-light text-center">
+              <strong class="d-block">Uttam</strong>
+              <small class="text-muted">PES1UG24CS697</small>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="p-3 border rounded bg-light text-center">
+              <strong class="d-block">Abhinav K</strong>
+              <small class="text-muted">PES1UG24CS701</small>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="p-3 border rounded bg-light text-center">
+              <strong class="d-block">Akshay Arcot</strong>
+              <small class="text-muted">PES1UG24CS705</small>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="p-3 border rounded bg-light text-center">
+              <strong class="d-block">Navaneeth Tanuboddi</strong>
+              <small class="text-muted">PES1UG24CS709</small>
+            </div>
+          </div>
+        </div>
+
+        <h4 class="fw-bold mt-4">Modular Architecture</h4>
+        <ul class="list-group list-group-flush mt-2">
+          <li class="list-group-item"><strong>accounts:</strong> Custom User model with Role-Based Access Control (Donor, Hospital, Staff, Administrator)</li>
+          <li class="list-group-item"><strong>donors:</strong> Donor profile management, donation history, and pre-screening eligibility questionnaire</li>
+          <li class="list-group-item"><strong>appointments:</strong> Slot reservation, capacity checking, rescheduling, and cancellation</li>
+          <li class="list-group-item"><strong>inventory:</strong> Bag ID tracking, serology test logging, quarantine management, component separation, and FEFO allocation</li>
+          <li class="list-group-item"><strong>core:</strong> Global layout, role-aware navigation, public stock lookup, and shared utilities</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

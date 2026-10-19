@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block title %}Quarantine & Testing - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="bi bi-shield-exclamation text-warning me-2"></i>Quarantine &amp; Serology Testing</h2>
+      <p class="text-muted mb-0">Units quarantined upon collection pending HIV, Hep B/C, and Syphilis clearance (SRS 4.8, 4.9)</p>
+    </div>
+    <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Inventory
+    </a>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4 text-center text-muted py-5">
+      <i class="bi bi-shield-check fs-1 text-success opacity-50 mb-3 d-block"></i>
+      <h5 class="fw-semibold">No units currently held in quarantine</h5>
+      <p class="small text-muted mb-0">All newly collected units default to Quarantined status until laboratory staff record Pass results across all mandatory infection tests (SRS BBMS-F-026).</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
