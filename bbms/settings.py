@@ -90,6 +90,12 @@ DATABASES = {
 # Custom User Model with Role-Based Access Control
 AUTH_USER_MODEL = 'accounts.User'
 
+# Authentication Backends (supports email and username login, SRS BBMS-SR-001)
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmailOrUsernameModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
