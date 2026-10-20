@@ -11,6 +11,19 @@
         <p class="text-muted small">Select an available blood center location, date, and time slot (SRS BBMS-F-012, BBMS-F-013)</p>
         <hr>
 
+        {% if not is_eligible %}
+          <div class="alert alert-warning d-flex align-items-start mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning mt-1"></i>
+            <div>
+              <div class="fw-bold">Medical Eligibility Pre-Screening Required (SRS BBMS-F-009)</div>
+              <p class="small mb-2">You must complete and pass the Medical Eligibility Questionnaire before confirming a blood donation appointment.</p>
+              <a href="{% url 'donors:eligibility' %}" class="btn btn-sm btn-danger">
+                <i class="bi bi-card-checklist me-1"></i>Complete Screening Questionnaire
+              </a>
+            </div>
+          </div>
+        {% endif %}
+
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">
