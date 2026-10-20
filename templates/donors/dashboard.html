@@ -42,11 +42,25 @@
     <div class="col-md-4">
       <div class="card border-0 shadow-sm p-3 bg-white">
         <div class="d-flex align-items-center gap-3">
-          <div class="card-icon mb-0 bg-primary-subtle text-primary"><i class="bi bi-shield-check"></i></div>
-          <div>
-            <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
-            <div class="fw-semibold text-primary">Eligible to Screen</div>
-          </div>
+          {% if is_eligible %}
+            <div class="card-icon mb-0 bg-success-subtle text-success"><i class="bi bi-shield-check"></i></div>
+            <div>
+              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="fw-semibold text-success"><i class="bi bi-check-circle-fill me-1"></i>Eligible</div>
+            </div>
+          {% elif latest_eligibility %}
+            <div class="card-icon mb-0 bg-danger-subtle text-danger"><i class="bi bi-shield-x"></i></div>
+            <div>
+              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="fw-semibold text-danger"><i class="bi bi-x-circle-fill me-1"></i>Temporarily Ineligible</div>
+            </div>
+          {% else %}
+            <div class="card-icon mb-0 bg-primary-subtle text-primary"><i class="bi bi-shield"></i></div>
+            <div>
+              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="fw-semibold text-primary">Pending Screening</div>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>
