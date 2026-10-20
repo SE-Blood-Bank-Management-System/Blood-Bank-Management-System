@@ -15,7 +15,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from inventory.forms import BloodGroupCorrectionForm
+from inventory.forms import BloodCollectionForm, BloodGroupCorrectionForm
 from inventory.models import BloodUnit, BloodUnitStatus, ComponentType
 
 
@@ -498,3 +498,235 @@ class BloodGroupWorkflowIntegrationTests(TestCase):
         # No donor or bag ID PII in response
         self.assertNotContains(res, self.u_avail_a.bag_id)
         self.assertNotContains(res, 'staff_flow')
+
+
+class BloodCollectionTests(TestCase):
+    """
+    Comprehensive tests for Blood Collection with automatic Bag ID generation (Issue #10).
+    SRS References:
+    - BBMS-F-017: Authorized staff blood collection recording
+    - BBMS-F-018: Volume and collection timestamp recording
+    - BBMS-F-019: Donor association and donation history
+    - BBMS-F-020: Automatic unique Bag ID generation
+    - BBMS-F-021: Unique Bag ID enforcement and duplicate rejection (TC-BAG-01)
+    - BBMS-F-026: Quarantined default status upon collection
+    """
+    def setUp(self):
+        self.client = Client()
+        self.donor = User.objects.create_user(
+            username='donor_alice',
+            email='alice@example.com',
+            password='password123',
+            role=User.Role.DONOR,
+            first_name='Alice',
+            last_name='Smith',
+            blood_group=BloodGroup.O_POS
+        )
+        self.donor2 = User.objects.create_user(
+            username='donor_bob',
+            email='bob@example.com',
+            password='password123',
+            role=User.Role.DONOR,
+            first_name='Bob',
+            last_name='Jones',
+            blood_group=BloodGroup.A_POS
+        )
+        self.staff = User.objects.create_user(
+            username='staff_mary',
+            email='mary@example.com',
+            password='password123',
+            role=User.Role.STAFF
+        )
+        self.admin = User.objects.create_superuser(
+            username='admin_boss',
+            email='boss@example.com',
+            password='password123'
+        )
+        self.hospital = User.objects.create_user(
+            username='hosp_city',
+            email='city@example.com',
+            password='password123',
+            role=User.Role.HOSPITAL,
+            is_approved=True
+        )
+
+    def test_successful_collection_recording_via_model_method(self):
+        """Staff can record a collection generating a unique Bag ID in Quarantined status (BBMS-F-017, F-020)."""
+        unit = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.O_POS,
+            volume_ml=450,
+            component_type=ComponentType.WHOLE_BLOOD,
+            notes='Clean donation without complications.'
+        )
+        self.assertIsNotNone(unit.pk)
+        self.assertTrue(unit.bag_id.startswith('BAG-'))
+        self.assertEqual(unit.status, BloodUnitStatus.QUARANTINED)
+        self.assertEqual(unit.donor, self.donor)
+        self.assertEqual(unit.collected_by, self.staff)
+        self.assertEqual(unit.blood_group, BloodGroup.O_POS)
+        self.assertEqual(unit.volume_ml, 450)
+        self.assertEqual(unit.component_type, ComponentType.WHOLE_BLOOD)
+        self.assertIn('Clean donation', unit.collection_notes)
+        self.assertEqual(self.donor.donations.count(), 1)
+        self.assertEqual(self.donor.donations.first(), unit)
+
+    def test_bag_id_uniqueness_and_duplicate_rejection(self):
+        """Verify automatic Bag ID generation is unique and duplicates are rejected (TC-BAG-01, BBMS-F-021)."""
+        unit1 = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.O_POS,
+            volume_ml=450
+        )
+        unit2 = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor2,
+            blood_group=BloodGroup.A_POS,
+            volume_ml=450
+        )
+        self.assertNotEqual(unit1.bag_id, unit2.bag_id)
+
+        # Attempt to create a duplicate unit with the same Bag ID should fail
+        with self.assertRaises(IntegrityError):
+            BloodUnit.objects.create(
+                bag_id=unit1.bag_id,
+                donor=self.donor,
+                blood_group=BloodGroup.O_POS,
+                volume_ml=450,
+                status=BloodUnitStatus.QUARANTINED
+            )
+
+    def test_collection_form_validation(self):
+        """Form validates acceptable volume, registered donor role, and blood group."""
+        # Valid form
+        form = BloodCollectionForm(data={
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.O_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+            'collection_notes': 'Normal donation',
+        })
+        self.assertTrue(form.is_valid())
+        saved_unit = form.save(staff_user=self.staff)
+        self.assertTrue(saved_unit.bag_id.startswith('BAG-'))
+        self.assertEqual(saved_unit.status, BloodUnitStatus.QUARANTINED)
+        self.assertEqual(saved_unit.collected_by, self.staff)
+
+        # Invalid volume (< 200 mL)
+        low_form = BloodCollectionForm(data={
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.O_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 100,
+            'location': 'Central Blood Bank',
+        })
+        self.assertFalse(low_form.is_valid())
+        self.assertIn('volume_ml', low_form.errors)
+
+        # Invalid volume (> 600 mL)
+        high_form = BloodCollectionForm(data={
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.O_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 700,
+            'location': 'Central Blood Bank',
+        })
+        self.assertFalse(high_form.is_valid())
+        self.assertIn('volume_ml', high_form.errors)
+
+        # Invalid blood group
+        bad_bg_form = BloodCollectionForm(data={
+            'donor': self.donor.pk,
+            'blood_group': 'X+',
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+        })
+        self.assertFalse(bad_bg_form.is_valid())
+        self.assertIn('blood_group', bad_bg_form.errors)
+
+        # Non-donor user selected (e.g. Hospital or Staff user)
+        bad_donor_form = BloodCollectionForm(data={
+            'donor': self.hospital.pk,
+            'blood_group': BloodGroup.O_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+        })
+        self.assertFalse(bad_donor_form.is_valid())
+        self.assertIn('donor', bad_donor_form.errors)
+
+    def test_staff_view_access(self):
+        """Staff and Admin can access record collection view, unauthorized users cannot."""
+        # Unauthenticated -> redirect to login
+        res = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res.status_code, 302)
+        self.assertIn(reverse('accounts:login'), res.url)
+
+        # Donor -> 403 Forbidden
+        self.client.login(username=self.donor.username, password='password123')
+        res = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res.status_code, 403)
+
+        # Hospital -> 403 Forbidden
+        self.client.login(username=self.hospital.username, password='password123')
+        res = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res.status_code, 403)
+
+        # Staff -> 200 OK
+        self.client.login(username=self.staff.username, password='password123')
+        res = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Record Blood Collection')
+        self.assertContains(res, 'Auto Bag ID')
+
+        # Admin -> 200 OK
+        self.client.login(username=self.admin.username, password='password123')
+        res = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res.status_code, 200)
+
+    def test_post_collection_creates_unit_and_redirects(self):
+        """Staff POST creates blood unit with unique Bag ID and redirects to detail page."""
+        self.client.login(username=self.staff.username, password='password123')
+        payload = {
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.B_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+            'collection_notes': 'Smooth donation flow.',
+        }
+        res = self.client.post(reverse('inventory:record_collection'), payload)
+        unit = BloodUnit.objects.filter(donor=self.donor, blood_group=BloodGroup.B_POS).first()
+        self.assertIsNotNone(unit)
+        self.assertEqual(unit.status, BloodUnitStatus.QUARANTINED)
+        self.assertEqual(unit.collected_by, self.staff)
+        self.assertRedirects(res, reverse('inventory:unit_detail', kwargs={'bag_id': unit.bag_id}))
+
+    def test_api_json_collection_endpoint(self):
+        """REST API POST records collection and returns Bag ID JSON payload (SAD Section 4.3)."""
+        self.client.login(username=self.staff.username, password='password123')
+        api_payload = {
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.AB_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+            'collection_notes': 'API automated intake test',
+        }
+        res = self.client.post(
+            reverse('inventory:record_collection'),
+            data=json.dumps(api_payload),
+            content_type='application/json',
+            HTTP_ACCEPT='application/json'
+        )
+        self.assertEqual(res.status_code, 201)
+        data = res.json()
+        self.assertEqual(data['status'], 'success')
+        self.assertTrue(data['bag_id'].startswith('BAG-'))
+        self.assertEqual(data['unit_status'], BloodUnitStatus.QUARANTINED)
+        self.assertEqual(data['blood_group'], BloodGroup.AB_POS)
+
