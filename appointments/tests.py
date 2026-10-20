@@ -25,3 +25,14 @@ class AppointmentViewTests(TestCase):
         book_res = self.client.get(reverse('appointments:book'))
         self.assertEqual(book_res.status_code, 200)
         self.assertTemplateUsed(book_res, 'appointments/book.html')
+
+    def test_book_appointment_rejects_unauthorized_roles(self):
+        hospital_user = User.objects.create_user(
+            username='hospital_intruder',
+            password='testpassword',
+            role=User.Role.HOSPITAL,
+            is_approved=True
+        )
+        self.client.login(username=hospital_user.username, password='testpassword')
+        book_res = self.client.get(reverse('appointments:book'))
+        self.assertEqual(book_res.status_code, 403)

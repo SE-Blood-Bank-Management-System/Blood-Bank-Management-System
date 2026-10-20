@@ -136,7 +136,7 @@ class User(AbstractUser):
 
     @property
     def is_staff_member(self):
-        return self.role == self.Role.STAFF or self.is_staff or self.is_superuser
+        return self.role in (self.Role.STAFF, self.Role.ADMIN) or self.is_staff or self.is_superuser
 
     @property
     def is_administrator(self):
