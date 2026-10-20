@@ -82,15 +82,20 @@ class DonorRegistrationTests(TestCase):
         self.assertFalse(donor.is_staff)
         self.assertFalse(donor.is_superuser)
 
-    def test_email_can_exceed_username_length_or_match_an_existing_username(self):
+    def test_email_matching_existing_username_is_rejected_to_avoid_ambiguous_login(self):
         User.objects.create_user('jane@example.com', email='someone@example.com')
-        for email in ['jane@example.com', 'a' * 64 + '@' + 'b' * 63 + '.' + 'c' * 30 + '.com']:
-            with self.subTest(email=email):
-                form = DonorRegistrationForm({**self.data, 'email': email})
-                self.assertTrue(form.is_valid(), form.errors)
-                donor = form.save()
-                self.assertLessEqual(len(donor.username), 150)
-                self.assertEqual(donor.email, email)
+        form = DonorRegistrationForm(self.data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('email', form.errors)
+
+    def test_email_can_exceed_username_length(self):
+        email = 'a' * 64 + '@' + 'b' * 63 + '.' + 'c' * 30 + '.com'
+        form = DonorRegistrationForm({**self.data, 'email': email})
+        self.assertTrue(form.is_valid(), form.errors)
+        donor = form.save()
+        self.assertLessEqual(len(donor.username), 150)
+        self.assertEqual(donor.email, email)
+        self.assertTrue(self.client.login(username=email, password=self.data['password']))
 
     def test_save_commit_false_does_not_persist(self):
         form = DonorRegistrationForm(self.data)

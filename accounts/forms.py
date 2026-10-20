@@ -81,6 +81,8 @@ class DonorRegistrationForm(forms.ModelForm):
         clean_email = email.strip().lower()
         if User.objects.filter(email__iexact=clean_email).exists():
             raise forms.ValidationError("An account with this email address already exists (SRS BBMS-F-003).")
+        if User.objects.filter(username__iexact=clean_email).exists():
+            raise forms.ValidationError('This email is already used as an account username. Please contact support.')
         return clean_email
 
     def clean_phone(self):
@@ -110,8 +112,7 @@ class DonorRegistrationForm(forms.ModelForm):
         # Use email as username if not specified
         user.username = self.cleaned_data.get('email')
         # Email accepts 254 characters; AbstractUser.username accepts only 150.
-        # Legacy staff usernames can also coincide with a new donor's email.
-        if len(user.username) > 150 or User.objects.filter(username=user.username).exists():
+        if len(user.username) > 150:
             user.username = f'donor_{uuid4().hex}'
         user.set_password(self.cleaned_data.get('password'))
         if commit:
