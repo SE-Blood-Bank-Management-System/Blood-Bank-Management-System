@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
+from django.db import IntegrityError
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import DonorRegistrationForm, HospitalRegistrationForm, UserProfileUpdateForm
@@ -86,17 +87,20 @@ def register_donor(request):
     if request.method == 'POST':
         form = DonorRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user, backend='accounts.backends.EmailOrUsernameModelBackend')
-            messages.success(
-                request,
-                f'Welcome to BBMS, {user.get_full_name() or user.username}! Your donor account is active.'
-            )
-            return redirect('donors:dashboard')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, error)
+            try:
+                user = form.save()
+            except IntegrityError:
+                # A competing registration may claim this email after validation.
+                if not User.objects.filter(email__iexact=form.cleaned_data['email']).exists():
+                    raise
+                form.add_error('email', 'An account with this email address already exists.')
+            else:
+                login(request, user, backend='accounts.backends.EmailOrUsernameModelBackend')
+                messages.success(
+                    request,
+                    f'Welcome to BBMS, {user.get_full_name() or user.username}! Your donor account is active.'
+                )
+                return redirect('donors:dashboard')
     else:
         form = DonorRegistrationForm()
 
