@@ -12,6 +12,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from inventory import views as inventory_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -20,6 +21,12 @@ urlpatterns = [
     path('donors/', include('donors.urls', namespace='donors')),
     path('appointments/', include('appointments.urls', namespace='appointments')),
     path('inventory/', include('inventory.urls', namespace='inventory')),
+    # REST API endpoints (SAD Section 4.3)
+    path(
+        'api/blood-units/<str:bag_id>/blood-group/',
+        inventory_views.api_update_unit_blood_group,
+        name='api_blood_unit_blood_group'
+    ),
 ]
 
 if settings.DEBUG:
