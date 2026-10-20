@@ -3,11 +3,11 @@
 {% block title %}Blood Inventory - BBMS{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container py-2">
   <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
       <h2 class="fw-bold mb-1"><i class="bi bi-box-seam text-danger me-2"></i>Blood Inventory Dashboard</h2>
-      <p class="text-muted mb-0">Real-time stock levels, FEFO order management, and component tracking (SRS 4.11, 4.12)</p>
+      <p class="text-muted mb-0">Real-time stock levels across all eight ABO/Rh blood groups, FEFO order management, and component tracking (SRS 4.7, 4.11, 4.12)</p>
     </div>
     <div class="d-flex gap-2">
       <a href="{% url 'inventory:quarantine' %}" class="btn btn-outline-warning text-dark">
@@ -56,7 +56,7 @@
   <!-- Component & Blood Group Inventory Grid -->
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-      <h5 class="fw-bold mb-0">Stock by ABO/Rh Blood Group</h5>
+      <h5 class="fw-bold mb-0">Stock by ABO/Rh Blood Group (SRS BBMS-F-022, BBMS-F-033)</h5>
       <span class="badge bg-light text-dark border">First-Expiry-First-Out (FEFO) Enabled</span>
     </div>
     <div class="card-body p-0">
@@ -73,19 +73,100 @@
             </tr>
           </thead>
           <tbody>
-            {% for bg in blood_groups %}
+            {% for item in stock_matrix %}
               <tr>
-                <td class="ps-4"><span class="blood-badge">{{ bg }}</span></td>
-                <td>0 units</td>
-                <td>0 units</td>
-                <td>0 units</td>
-                <td>0 units</td>
-                <td><span class="badge bg-secondary">0 units</span></td>
+                <td class="ps-4"><span class="blood-badge">{{ item.blood_group }}</span></td>
+                <td>{{ item.whole_blood }} units</td>
+                <td>{{ item.rbc }} units</td>
+                <td>{{ item.platelets }} units</td>
+                <td>{{ item.plasma }} units</td>
+                <td>
+                  <span class="badge {% if item.total > 0 %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ item.total }} units
+                  </span>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <!-- Blood Units List & Blood Group Management -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-droplet text-danger me-2"></i>Blood Unit Registry &amp; Blood Group Verification
+        </h5>
+        <small class="text-muted">View blood units and manage laboratory-confirmed blood groups (SRS BBMS-F-020–F-023)</small>
+      </div>
+      <span class="badge bg-light text-secondary border">Total Logged: {{ recent_units|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if recent_units %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col" class="ps-4">Bag ID</th>
+                <th scope="col">Lab Blood Group</th>
+                <th scope="col">Donor Self-Report</th>
+                <th scope="col">Component</th>
+                <th scope="col">Volume</th>
+                <th scope="col">Status</th>
+                <th scope="col">Collection Date</th>
+                <th scope="col" class="text-end pe-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for unit in recent_units %}
+                <tr>
+                  <td class="ps-4 font-monospace fw-bold">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="text-decoration-none">
+                      {{ unit.bag_id }}
+                    </a>
+                  </td>
+                  <td>
+                    {% if unit.blood_group %}
+                      <span class="blood-badge py-1 px-2 fs-6">{{ unit.blood_group }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Pending</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if unit.donor_self_reported_group %}
+                      <span class="badge bg-light text-dark border">{{ unit.donor_self_reported_group }}</span>
+                    {% else %}
+                      <span class="text-muted small">N/A</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ unit.component_type }}</td>
+                  <td>{{ unit.volume_ml }} mL</td>
+                  <td>
+                    <span class="badge {% if unit.status == 'Available' %}bg-success{% elif unit.status == 'Quarantined' %}bg-warning text-dark{% elif unit.status == 'Discarded' %}bg-danger{% else %}bg-secondary{% endif %}">
+                      {{ unit.status }}
+                    </span>
+                  </td>
+                  <td class="small text-muted">{{ unit.collection_date|date:"d M Y, H:i" }}</td>
+                  <td class="text-end pe-4">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-pencil-square me-1"></i>Manage Group
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-inbox fs-1 opacity-50 mb-3 d-block"></i>
+          <h6 class="fw-semibold">No blood units recorded yet</h6>
+          <p class="small text-muted mb-0">Blood units created upon donation collection will appear here for blood group confirmation and testing.</p>
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>

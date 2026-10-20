@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block title %}Blood Unit {{ unit.bag_id }} - BBMS{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h2 class="fw-bold mb-0"><i class="bi bi-droplet-half text-danger me-2"></i>Unit {{ unit.bag_id }}</h2>
+        <span class="badge {% if unit.status == 'Available' %}bg-success{% elif unit.status == 'Quarantined' %}bg-warning text-dark{% elif unit.status == 'Discarded' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+          {{ unit.status }}
+        </span>
+      </div>
+      <p class="text-muted mb-0">ABO/Rh Blood Group Verification &amp; Laboratory Audit (SRS BBMS-F-020–F-023)</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Inventory
+      </a>
+      <a href="{% url 'inventory:quarantine' %}" class="btn btn-outline-warning text-dark">
+        <i class="bi bi-shield-exclamation me-1"></i>Quarantine List
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-4 mb-4">
+    <!-- Comparison Card: Donor Self-Reported vs Unit Lab-Confirmed -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-person-badge text-primary me-2"></i>Donor Profile vs. Unit Record</h5>
+          <small class="text-muted">SRS BBMS-F-023: Donor self-reported blood group is stored separately from unit lab-confirmed blood group.</small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="p-3 bg-light rounded text-center">
+                <div class="text-muted small mb-1">Donor Self-Reported Group</div>
+                {% if unit.donor_self_reported_group %}
+                  <span class="blood-badge fs-4">{{ unit.donor_self_reported_group }}</span>
+                  <div class="small text-muted mt-1"><i class="bi bi-info-circle me-1"></i>From donor profile</div>
+                {% else %}
+                  <span class="badge bg-secondary">Not Specified</span>
+                  <div class="small text-muted mt-1">No self-report on file</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="p-3 bg-danger-subtle rounded text-center border border-danger-subtle">
+                <div class="text-muted small mb-1">Lab-Confirmed Unit Group</div>
+                {% if unit.blood_group %}
+                  <span class="blood-badge fs-4">{{ unit.blood_group }}</span>
+                  <div class="small text-danger fw-semibold mt-1"><i class="bi bi-check-circle-fill me-1"></i>Laboratory Verified</div>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Pending Testing</span>
+                  <div class="small text-muted mt-1">Awaiting determination</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <h6 class="fw-bold text-secondary mb-3">Donor Information</h6>
+          {% if unit.donor %}
+            <table class="table table-sm table-borderless mb-0">
+              <tbody>
+                <tr>
+                  <th scope="row" class="text-muted w-40">Full Name:</th>
+                  <td class="fw-semibold">{{ unit.donor.get_full_name|default:unit.donor.username }}</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="text-muted">Username:</th>
+                  <td>{{ unit.donor.username }}</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="text-muted">Contact Email:</th>
+                  <td>{{ unit.donor.email|default:"N/A" }}</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="text-muted">Phone:</th>
+                  <td>{{ unit.donor.phone|default:"N/A" }}</td>
+                </tr>
+              </tbody>
+            </table>
+          {% else %}
+            <p class="text-muted mb-0"><i class="bi bi-info-circle me-1"></i>Unit collected without a linked donor account.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Blood Unit Technical Details -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clipboard2-pulse text-danger me-2"></i>Unit Specifications</h5>
+          <small class="text-muted">Identification, volume, collection, and storage status</small>
+        </div>
+        <div class="card-body">
+          <table class="table table-sm table-borderless mb-3">
+            <tbody>
+              <tr>
+                <th scope="row" class="text-muted w-40">Unique Bag ID:</th>
+                <td class="fw-bold font-monospace">{{ unit.bag_id }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Component:</th>
+                <td><span class="badge bg-light text-dark border">{{ unit.component_type }}</span></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Collected Volume:</th>
+                <td>{{ unit.volume_ml }} mL</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Collection Date:</th>
+                <td>{{ unit.collection_date|date:"d M Y, H:i" }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Expiry Date:</th>
+                <td>
+                  {% if unit.expiry_date %}
+                    {{ unit.expiry_date|date:"d M Y, H:i" }}
+                    {% if unit.is_expired %}
+                      <span class="badge bg-danger ms-1">Expired</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted">Pending availability</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Storage Facility:</th>
+                <td>{{ unit.location }}</td>
+              </tr>
+              {% if unit.parent_unit %}
+                <tr>
+                  <th scope="row" class="text-muted">Originating Unit:</th>
+                  <td><a href="{% url 'inventory:unit_detail' unit.parent_unit.bag_id %}">{{ unit.parent_unit.bag_id }}</a></td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+
+          <div class="p-3 bg-light rounded mt-3">
+            <h6 class="fw-bold small text-secondary text-uppercase mb-2">Confirmation &amp; Audit Trail</h6>
+            <div class="small text-muted mb-1">
+              <strong>Confirmed by:</strong> {{ unit.lab_confirmed_by.username|default:"Not recorded yet" }}
+            </div>
+            <div class="small text-muted mb-1">
+              <strong>Timestamp:</strong> {{ unit.lab_confirmed_at|date:"d M Y, H:i"|default:"Pending" }}
+            </div>
+            {% if unit.blood_group_notes %}
+              <div class="small text-muted mt-2">
+                <strong>Log / Notes:</strong>
+                <pre class="bg-white p-2 border rounded mt-1 mb-0 font-monospace small" style="white-space: pre-wrap;">{{ unit.blood_group_notes }}</pre>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record / Correct Lab-Confirmed Blood Group Form -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-pencil-square text-danger me-2"></i>Record or Correct Laboratory Blood Group
+        </h5>
+        <small class="text-muted">SRS BBMS-F-023: Authorized staff can record or correct a unit's blood group independently.</small>
+      </div>
+      <span class="badge bg-light text-secondary border">Role: Staff / Administrator</span>
+    </div>
+    <div class="card-body p-4">
+      <form method="post" action="{% url 'inventory:update_blood_group' unit.bag_id %}">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="id_blood_group" class="form-label fw-semibold">
+              Confirmed ABO/Rh Group <span class="text-danger">*</span>
+            </label>
+            {{ form.blood_group }}
+            {% if form.blood_group.errors %}
+              <div class="text-danger small mt-1">{{ form.blood_group.errors|striptags }}</div>
+            {% endif %}
+            <div class="form-text small">{{ form.blood_group.help_text }}</div>
+          </div>
+          <div class="col-md-8">
+            <label for="id_notes" class="form-label fw-semibold">
+              Correction Notes / Rationale
+            </label>
+            {{ form.notes }}
+            {% if form.notes.errors %}
+              <div class="text-danger small mt-1">{{ form.notes.errors|striptags }}</div>
+            {% endif %}
+            <div class="form-text small">{{ form.notes.help_text }}</div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <button type="submit" class="btn btn-danger px-4 py-2">
+            <i class="bi bi-check2-circle me-1"></i>Save Lab-Confirmed Blood Group
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

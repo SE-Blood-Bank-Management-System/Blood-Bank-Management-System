@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
+from core.constants import BloodGroup, validate_blood_group
 
 
 class CustomUserManager(UserManager):
@@ -51,15 +52,8 @@ class User(AbstractUser):
         FEMALE = 'Female', 'Female'
         OTHER = 'Other', 'Other'
 
-    class BloodGroup(models.TextChoices):
-        A_POS = 'A+', 'A+'
-        A_NEG = 'A-', 'A-'
-        B_POS = 'B+', 'B+'
-        B_NEG = 'B-', 'B-'
-        AB_POS = 'AB+', 'AB+'
-        AB_NEG = 'AB-', 'AB-'
-        O_POS = 'O+', 'O+'
-        O_NEG = 'O-', 'O-'
+    # Shared BloodGroup definition (SRS BBMS-F-022)
+    BloodGroup = BloodGroup
 
     # Unique email address per account (SRS BBMS-F-003, BBMS-SR-001)
     email = models.EmailField(
@@ -95,7 +89,8 @@ class User(AbstractUser):
         max_length=5,
         choices=BloodGroup.choices,
         blank=True,
-        help_text='Self-reported or confirmed ABO/Rh blood group (SRS BBMS-F-006, BBMS-F-022)'
+        validators=[validate_blood_group],
+        help_text='Self-reported ABO/Rh blood group (SRS BBMS-F-006, BBMS-F-022)'
     )
     address = models.TextField(
         blank=True,
@@ -192,6 +187,8 @@ class User(AbstractUser):
             self.email = self.email.strip().lower()
         else:
             self.email = None
+        if self.blood_group:
+            validate_blood_group(self.blood_group)
 
     def save(self, *args, **kwargs):
         if not self.email:

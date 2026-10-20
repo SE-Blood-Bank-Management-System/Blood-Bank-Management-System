@@ -52,7 +52,30 @@ The system implements a centralized Custom User Model (`accounts.models.User`) a
 
 ---
 
-## 3. Modular Architecture & Apps
+## 3. Blood Group Management (SRS 4.7: BBMS-F-022, BBMS-F-023)
+
+The system implements consistent blood group management across donors, collected blood units, testing, and inventory workflows (TC-BAG-02):
+
+### Core Architecture & Valid Blood Groups
+- **Eight Standard ABO/Rh Blood Groups**: Shared canonical definitions (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`) defined in `core.constants.BloodGroup` and `VALID_BLOOD_GROUPS`.
+- **Validation**: Enforced via `core.constants.validate_blood_group` across models, forms, and API endpoints. Invalid blood groups (e.g. `C+`, `XYZ`) are strictly rejected.
+- **Transfusion Compatibility Rules (SRS BBMS-F-049)**: Red blood cell compatibility matrix implemented in `core.constants.RBC_COMPATIBILITY_RULES` and `is_blood_compatible()` helper.
+
+### Independent Storage & Separation of Concerns (SRS BBMS-F-023)
+- **Donor Self-Reported Blood Group**: Stored on `User.blood_group` (or donor profile) as self-reported by the donor during registration or profile editing.
+- **Unit Laboratory-Confirmed Blood Group**: Stored independently on `BloodUnit.blood_group` for collected blood units.
+- **Isolation Guarantee**: Modifying or correcting a blood unit's laboratory blood group does **not** alter the donor's self-reported profile value, and vice versa.
+
+### Recording & Correction Workflows
+- **Authorized Staff Controls**: Only users with the `STAFF` or `ADMIN` role can record or correct a blood unit's blood group. Unauthorized users (donors, hospitals) are rejected with HTTP 403 Forbidden.
+- **Audit Logging**: Every blood group update records the responsible staff member (`lab_confirmed_by`), timestamp (`lab_confirmed_at`), and correction rationale (`blood_group_notes`).
+- **Web UI & REST API Endpoints**:
+  - Staff Web View: `GET/POST /inventory/blood-units/<bag_id>/blood-group/`
+  - REST API: `PATCH/POST /api/blood-units/<bag_id>/blood-group/` (accepts JSON `{"blood_group": "A+", "notes": "..."}`)
+
+---
+
+## 4. Modular Architecture & Apps
 
 | Django App | SRS Section Reference | Key Responsibilities |
 | :--- | :--- | :--- |
@@ -64,7 +87,7 @@ The system implements a centralized Custom User Model (`accounts.models.User`) a
 
 ---
 
-## 4. Prerequisites
+## 5. Prerequisites
 
 - **Python**: Version 3.10 or higher
 - **pip**: Standard Python package manager
@@ -72,7 +95,7 @@ The system implements a centralized Custom User Model (`accounts.models.User`) a
 
 ---
 
-## 5. Quickstart / Run Steps
+## 6. Quickstart / Run Steps
 
 A fresh clone of the repository runs with standard Django commands:
 
@@ -122,7 +145,7 @@ Open your browser and navigate to:
 
 ---
 
-## 6. Running Automated Tests & Linting
+## 7. Running Automated Tests & Linting
 
 ### Run automated unit and integration tests:
 ```bash
@@ -145,7 +168,7 @@ python manage.py test inventory
 
 ---
 
-## 7. Technology Stack
+## 8. Technology Stack
 
 - **Backend**: Python 3.10+ / Django 5.2 (SRS 2.4, NF-013)
 - **Database**: SQLite (SRS 2.4, NF-014)

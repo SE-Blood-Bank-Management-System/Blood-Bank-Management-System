@@ -3,11 +3,11 @@
 {% block title %}Quarantine & Testing - BBMS{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container py-2">
   <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
       <h2 class="fw-bold mb-1"><i class="bi bi-shield-exclamation text-warning me-2"></i>Quarantine &amp; Serology Testing</h2>
-      <p class="text-muted mb-0">Units quarantined upon collection pending HIV, Hep B/C, and Syphilis clearance (SRS 4.8, 4.9)</p>
+      <p class="text-muted mb-0">Units quarantined upon collection pending blood group confirmation and infection testing clearance (SRS 4.7, 4.8, 4.9)</p>
     </div>
     <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Back to Inventory
@@ -15,10 +15,81 @@
   </div>
 
   <div class="card border-0 shadow-sm">
-    <div class="card-body p-4 text-center text-muted py-5">
-      <i class="bi bi-shield-check fs-1 text-success opacity-50 mb-3 d-block"></i>
-      <h5 class="fw-semibold">No units currently held in quarantine</h5>
-      <p class="small text-muted mb-0">All newly collected units default to Quarantined status until laboratory staff record Pass results across all mandatory infection tests (SRS BBMS-F-026).</p>
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <h5 class="fw-bold mb-0 text-dark">
+        <i class="bi bi-hourglass-split text-warning me-2"></i>Currently Quarantined Units (SRS BBMS-F-026, BBMS-F-030)
+      </h5>
+      <span class="badge bg-warning text-dark border">Count: {{ quarantined_units|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if quarantined_units %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col" class="ps-4">Bag ID</th>
+                <th scope="col">Lab Blood Group</th>
+                <th scope="col">Donor Self-Report</th>
+                <th scope="col">Donor</th>
+                <th scope="col">Component</th>
+                <th scope="col">Collection Date</th>
+                <th scope="col">Quarantine Duration</th>
+                <th scope="col" class="text-end pe-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for unit in quarantined_units %}
+                <tr>
+                  <td class="ps-4 font-monospace fw-bold">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="text-decoration-none">
+                      {{ unit.bag_id }}
+                    </a>
+                  </td>
+                  <td>
+                    {% if unit.blood_group %}
+                      <span class="blood-badge py-1 px-2 fs-6">{{ unit.blood_group }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Pending Lab Group</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if unit.donor_self_reported_group %}
+                      <span class="badge bg-light text-dark border">{{ unit.donor_self_reported_group }}</span>
+                    {% else %}
+                      <span class="text-muted small">N/A</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if unit.donor %}
+                      {{ unit.donor.get_full_name|default:unit.donor.username }}
+                    {% else %}
+                      <span class="text-muted small">Unknown</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ unit.component_type }}</td>
+                  <td class="small text-muted">{{ unit.collection_date|date:"d M Y, H:i" }}</td>
+                  <td>
+                    <span class="badge bg-light text-dark border">
+                      <i class="bi bi-clock me-1"></i>{{ unit.quarantine_duration_days }} days
+                    </span>
+                  </td>
+                  <td class="text-end pe-4">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-pencil-square me-1"></i>Verify / Record Group
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted py-5">
+          <i class="bi bi-shield-check fs-1 text-success opacity-50 mb-3 d-block"></i>
+          <h5 class="fw-semibold">No units currently held in quarantine</h5>
+          <p class="small text-muted mb-0">All newly collected units default to Quarantined status until laboratory staff record Pass results across all mandatory infection tests and verify blood group (SRS BBMS-F-026).</p>
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>
