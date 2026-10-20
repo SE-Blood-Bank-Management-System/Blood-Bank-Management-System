@@ -119,6 +119,20 @@ class BloodUnit(models.Model):
         help_text='Traceability reference to originating whole-blood unit Bag ID (SRS BBMS-F-032)'
     )
 
+    # Blood Collection Staff & Audit Details (SRS BBMS-F-017, BBMS-F-018)
+    collected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='collected_blood_units',
+        help_text='Authorized staff member who recorded this blood collection (SRS BBMS-F-017)'
+    )
+    collection_notes = models.TextField(
+        blank=True,
+        help_text='Staff notes or clinical observations made during donation (SRS BBMS-F-018)'
+    )
+
     # Laboratory Confirmation & Correction Audit Trail (SRS BBMS-F-023, BBMS-F-058)
     lab_confirmed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -169,6 +183,78 @@ class BloodUnit(models.Model):
         base_date = from_date or timezone.now()
         shelf_days = COMPONENT_SHELF_LIFE_DAYS.get(component_type, 42)
         return base_date + timedelta(days=shelf_days)
+
+    @classmethod
+    def record_collection(
+        cls,
+        staff_user,
+        donor,
+        blood_group,
+        volume_ml=450,
+        component_type=ComponentType.WHOLE_BLOOD,
+        collection_date=None,
+        location='Central Blood Bank',
+        notes=''
+    ):
+        """
+        Record a completed blood collection with automatic unique Bag ID generation.
+        SRS References:
+        - BBMS-F-017: Staff authorization check
+        - BBMS-F-018: Volume and collection timestamp recording
+        - BBMS-F-019: Association with donor and history tracking
+        - BBMS-F-020: Automatic unique Bag ID generation
+        - BBMS-F-021: Unique Bag ID enforcement
+        - BBMS-F-026: Default Quarantined status
+        """
+        if staff_user is not None:
+            user_role = getattr(staff_user, 'role', None)
+            is_authorized = (
+                user_role in ('STAFF', 'ADMIN') or
+                getattr(staff_user, 'is_staff', False) or
+                getattr(staff_user, 'is_superuser', False)
+            )
+            if not is_authorized:
+                raise PermissionDenied(
+                    "Only authorized blood bank staff or administrators can record blood collections "
+                    "(SRS BBMS-F-017, BBMS-SR-003)."
+                )
+
+        if not donor:
+            raise ValidationError("A donor must be specified for blood collection (SRS BBMS-F-017).")
+
+        donor_role = getattr(donor, 'role', None)
+        if donor_role and donor_role != 'DONOR':
+            raise ValidationError("Blood collection must be associated with a valid registered donor (SRS BBMS-F-019).")
+
+        if volume_ml is None or volume_ml <= 0:
+            raise ValidationError("Collected volume must be greater than 0 mL.")
+        if volume_ml < 200 or volume_ml > 600:
+            raise ValidationError(
+                f"Collected volume {volume_ml} mL is outside the standard acceptable donation range (200-600 mL)."
+            )
+
+        if not blood_group:
+            raise ValidationError("Blood group is required.")
+        normalized_bg = str(blood_group).strip().upper()
+        validate_blood_group(normalized_bg)
+
+        c_date = collection_date or timezone.now()
+        bag_id = cls.generate_unique_bag_id()
+
+        unit = cls(
+            bag_id=bag_id,
+            donor=donor,
+            collected_by=staff_user,
+            blood_group=normalized_bg,
+            component_type=component_type,
+            volume_ml=volume_ml,
+            collection_date=c_date,
+            status=BloodUnitStatus.QUARANTINED,
+            location=location,
+            collection_notes=notes,
+        )
+        unit.save()
+        return unit
 
     @property
     def is_available(self):
