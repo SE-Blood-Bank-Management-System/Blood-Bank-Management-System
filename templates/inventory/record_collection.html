@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Blood Collection - BBMS{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="bi bi-droplet-fill text-danger me-2"></i>Record Blood Collection</h2>
+      <p class="text-muted mb-0">Record completed blood donations with automatic unique Bag ID assignment and initial quarantine placement (SRS 4.5, 4.6)</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-box-seam me-1"></i>Inventory Dashboard
+      </a>
+      <a href="{% url 'inventory:quarantine' %}" class="btn btn-outline-warning text-dark">
+        <i class="bi bi-shield-exclamation me-1"></i>Quarantine List
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {# Left Column: Collection Form #}
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-clipboard2-pulse text-danger me-2"></i>Donation Intake Form
+          </h5>
+          <div class="d-flex gap-1">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" title="SRS BBMS-F-020">
+              <i class="bi bi-qr-code me-1"></i>Auto Bag ID
+            </span>
+            <span class="badge bg-warning-subtle text-dark border border-warning-subtle" title="SRS BBMS-F-026">
+              <i class="bi bi-shield-exclamation me-1"></i>Quarantined Default
+            </span>
+          </div>
+        </div>
+
+        <div class="card-body p-4">
+          <form method="post" action="{% url 'inventory:record_collection' %}" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger" role="alert">
+                {% for err in form.non_field_errors %}
+                  <div><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ err }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="mb-3">
+              <label for="{{ form.donor.id_for_label }}" class="form-label fw-semibold">
+                {{ form.donor.label }} <span class="text-danger">*</span>
+              </label>
+              {{ form.donor }}
+              <div class="form-text">{{ form.donor.help_text }}</div>
+              {% if form.donor.errors %}
+                <div class="text-danger small mt-1">{{ form.donor.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label for="{{ form.blood_group.id_for_label }}" class="form-label fw-semibold">
+                  {{ form.blood_group.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.blood_group }}
+                <div class="form-text">{{ form.blood_group.help_text }}</div>
+                {% if form.blood_group.errors %}
+                  <div class="text-danger small mt-1">{{ form.blood_group.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="col-md-6">
+                <label for="{{ form.component_type.id_for_label }}" class="form-label fw-semibold">
+                  {{ form.component_type.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.component_type }}
+                <div class="form-text">{{ form.component_type.help_text }}</div>
+                {% if form.component_type.errors %}
+                  <div class="text-danger small mt-1">{{ form.component_type.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label for="{{ form.volume_ml.id_for_label }}" class="form-label fw-semibold">
+                  {{ form.volume_ml.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.volume_ml }}
+                <div class="form-text">{{ form.volume_ml.help_text }}</div>
+                {% if form.volume_ml.errors %}
+                  <div class="text-danger small mt-1">{{ form.volume_ml.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="col-md-6">
+                <label for="{{ form.location.id_for_label }}" class="form-label fw-semibold">
+                  {{ form.location.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.location }}
+                <div class="form-text">{{ form.location.help_text }}</div>
+                {% if form.location.errors %}
+                  <div class="text-danger small mt-1">{{ form.location.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label for="{{ form.collection_notes.id_for_label }}" class="form-label fw-semibold">
+                {{ form.collection_notes.label }}
+              </label>
+              {{ form.collection_notes }}
+              <div class="form-text">{{ form.collection_notes.help_text }}</div>
+              {% if form.collection_notes.errors %}
+                <div class="text-danger small mt-1">{{ form.collection_notes.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+              <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
+                Cancel
+              </a>
+              <button type="submit" class="btn btn-danger px-4">
+                <i class="bi bi-check-circle me-1"></i>Confirm Collection &amp; Generate Bag ID
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# Right Column: Guidelines & Policy Info #}
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+          <h6 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-info-circle text-primary me-2"></i>Collection &amp; Quarantine Safeguards
+          </h6>
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0 d-flex flex-column gap-3 small">
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-check-circle-fill text-success fs-6 mt-1"></i>
+              <div>
+                <strong>Automatic Unique Bag ID (BBMS-F-020, F-021):</strong>
+                A unique, collision-proof identifier formatted as <code>BAG-YYYYMMDD-XXXXXX</code> is generated at the moment of intake and guaranteed by database constraints.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-shield-lock-fill text-warning fs-6 mt-1"></i>
+              <div>
+                <strong>Default Quarantine Status (BBMS-F-026):</strong>
+                Newly collected blood units are immediately locked in <em>Quarantined</em> status. They are excluded from available inventory and allocation until all four serology tests pass.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-clock-history text-info fs-6 mt-1"></i>
+              <div>
+                <strong>Immediate Donor History Update (BBMS-F-019):</strong>
+                Recording this collection updates the donor's donation record, enabling profile history displays and interval calculations.
+              </div>
+            </li>
+            <li class="d-flex align-items-start gap-2">
+              <i class="bi bi-person-badge-fill text-secondary fs-6 mt-1"></i>
+              <div>
+                <strong>Authorized Staff Audit (BBMS-SR-003):</strong>
+                The intake session records your staff user credentials (<code>{{ user.username }}</code>) and the authoritative server timestamp.
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Recent Collections Table #}
+  <div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <h5 class="fw-bold mb-0 text-dark">
+        <i class="bi bi-clock-history text-secondary me-2"></i>Recent Blood Collections
+      </h5>
+      <span class="badge bg-light text-muted border">Showing latest 10</span>
+    </div>
+    <div class="card-body p-0">
+      {% if recent_collections %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col" class="ps-4">Bag ID</th>
+                <th scope="col">Donor</th>
+                <th scope="col">Blood Group</th>
+                <th scope="col">Component</th>
+                <th scope="col">Volume</th>
+                <th scope="col">Collection Date</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="text-end pe-4">Recorded By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for unit in recent_collections %}
+                <tr>
+                  <td class="ps-4 font-monospace fw-bold">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="text-decoration-none">
+                      {{ unit.bag_id }}
+                    </a>
+                  </td>
+                  <td>
+                    {% if unit.donor %}
+                      <span class="fw-semibold">{{ unit.donor.get_full_name|default:unit.donor.username }}</span>
+                      <small class="text-muted d-block">@{{ unit.donor.username }}</small>
+                    {% else %}
+                      <span class="text-muted fst-italic">Unassigned</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge bg-danger text-white">{{ unit.blood_group }}</span>
+                  </td>
+                  <td>{{ unit.component_type }}</td>
+                  <td>{{ unit.volume_ml }} mL</td>
+                  <td class="text-muted small">{{ unit.collection_date|date:"Y-m-d H:i" }}</td>
+                  <td>
+                    {% if unit.status == 'Quarantined' %}
+                      <span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i>Quarantined</span>
+                    {% elif unit.status == 'Available' %}
+                      <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Available</span>
+                    {% elif unit.status == 'Discarded' %}
+                      <span class="badge bg-dark"><i class="bi bi-trash me-1"></i>Discarded</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ unit.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end pe-4 text-muted small">
+                    {{ unit.collected_by.username|default:"Staff" }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+          No blood units recorded yet. Use the form above to record the first blood collection!
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -57,6 +57,11 @@
           {% elif user.role == 'STAFF' %}
             {# Blood Bank Staff Role Navigation #}
             <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:record_collection' %}">
+                <i class="bi bi-droplet-fill text-danger me-1"></i>Record Collection
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link" href="{% url 'inventory:dashboard' %}">
                 <i class="bi bi-box-seam me-1"></i>Inventory
               </a>
@@ -74,6 +79,11 @@
 
           {% elif user.role == 'ADMIN' or user.is_superuser %}
             {# Administrator Role Navigation #}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'inventory:record_collection' %}">
+                <i class="bi bi-droplet-fill text-danger me-1"></i>Record Collection
+              </a>
+            </li>
             <li class="nav-item">
               <a class="nav-link" href="{% url 'inventory:dashboard' %}">
                 <i class="bi bi-box-seam me-1"></i>Inventory
