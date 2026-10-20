@@ -100,6 +100,33 @@ class DonorRegistrationTests(TestCase):
         self.assertEqual(User.objects.count(), 0)
         self.assertTrue(donor.check_password(self.data['password']))
 
+    def test_failure_during_save_rolls_back_account(self):
+        original_save = User.save
+
+        def failing_save(user, *args, **kwargs):
+            original_save(user, *args, **kwargs)
+            raise RuntimeError('Simulated failure after insert')
+
+        form = DonorRegistrationForm(self.data)
+        self.assertTrue(form.is_valid(), form.errors)
+        with patch.object(User, 'save', failing_save), self.assertRaises(RuntimeError):
+            form.save()
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_duplicate_email_claimed_after_validation_shows_field_error(self):
+        original_save = DonorRegistrationForm.save
+
+        def competing_save(form):
+            User.objects.create_user('competitor', email=self.data['email'])
+            return original_save(form)
+
+        with patch.object(DonorRegistrationForm, 'save', competing_save):
+            response = self.client.post(self.url, self.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('email', response.context['form'].errors)
+        self.assertEqual(User.objects.count(), 1)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
     def test_registration_page_is_public_and_csrf_protected(self):
         self.assertEqual(self.client.get(self.url).status_code, 200)
         from django.test import Client

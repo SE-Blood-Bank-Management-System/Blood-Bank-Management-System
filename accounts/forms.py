@@ -1,5 +1,10 @@
+import re
+from uuid import uuid4
+
 from django import forms
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 from .models import User
 
@@ -13,13 +18,14 @@ class DonorRegistrationForm(forms.ModelForm):
     - Strong password hashing via PBKDF2/bcrypt (BBMS-SR-002)
     """
     dob = forms.DateField(
+        label='Date of birth',
+        help_text='You must be at least 18 years old to register.',
         required=True,
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
     )
     password = forms.CharField(
         required=True,
         widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Choose a secure password'}),
-        validators=[validate_password]
     )
     first_name = forms.CharField(
         max_length=150,
@@ -36,6 +42,8 @@ class DonorRegistrationForm(forms.ModelForm):
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'john.doe@example.com'})
     )
     phone = forms.CharField(
+        label='Contact number',
+        help_text='Enter 7 to 15 digits; spaces, parentheses, hyphens and a leading + are allowed.',
         max_length=20,
         required=True,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+91 9876543210'})
@@ -46,6 +54,7 @@ class DonorRegistrationForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     blood_group = forms.ChoiceField(
+        label='Self-reported blood group',
         choices=[('', 'Unknown / Not sure')] + list(User.BloodGroup.choices),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -74,6 +83,24 @@ class DonorRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("An account with this email address already exists (SRS BBMS-F-003).")
         return clean_email
 
+    def clean_phone(self):
+        phone = self.cleaned_data['phone']
+        digits = re.sub(r'\D', '', phone)
+        if not re.fullmatch(r'\+?[0-9 ()-]+', phone) or not 7 <= len(digits) <= 15:
+            raise forms.ValidationError('Enter a valid contact number containing 7 to 15 digits.')
+        return phone
+
+    def _post_clean(self):
+        super()._post_clean()
+        # ModelForm has now populated the applicant's name and email on the user.
+        password = self.cleaned_data.get('password')
+        if password:
+            try:
+                validate_password(password, self.instance)
+            except ValidationError as errors:
+                self.add_error('password', errors)
+
+    @transaction.atomic
     def save(self, commit=True):
         user = super().save(commit=False)
         user.role = User.Role.DONOR
@@ -82,6 +109,10 @@ class DonorRegistrationForm(forms.ModelForm):
         user.email = self.cleaned_data.get('email')
         # Use email as username if not specified
         user.username = self.cleaned_data.get('email')
+        # Email accepts 254 characters; AbstractUser.username accepts only 150.
+        # Legacy staff usernames can also coincide with a new donor's email.
+        if len(user.username) > 150 or User.objects.filter(username=user.username).exists():
+            user.username = f'donor_{uuid4().hex}'
         user.set_password(self.cleaned_data.get('password'))
         if commit:
             user.save()
