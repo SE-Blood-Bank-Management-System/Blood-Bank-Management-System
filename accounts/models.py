@@ -159,6 +159,23 @@ class User(AbstractUser):
         user_age = self.age
         return user_age is not None and user_age >= 18
 
+    @property
+    def is_eligible(self):
+        """
+        Returns True if the donor has a passing (Eligible) medical questionnaire result.
+        SRS: BBMS-F-009 to BBMS-F-011.
+        """
+        latest = self.get_latest_eligibility()
+        return latest is not None and latest.is_eligible
+
+    def get_latest_eligibility(self):
+        """
+        Retrieve the latest MedicalEligibilityResponse record for this user, or None.
+        SRS: BBMS-F-009 to BBMS-F-011.
+        """
+        from donors.models import MedicalEligibilityResponse
+        return MedicalEligibilityResponse.objects.filter(donor=self).order_by('-created_at').first()
+
     def has_role(self, *roles):
         """
         Check if user has any of the given roles.

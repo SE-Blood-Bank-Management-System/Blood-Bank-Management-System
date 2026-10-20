@@ -27,10 +27,18 @@ def book_appointment(request):
         {'id': 2, 'name': 'Metro Memorial Blood Center', 'address': '45 Red Cross Way'},
         {'id': 3, 'name': 'University Hospital Blood Donation Wing', 'address': '12 Campus Road'},
     ]
-    slots = ['09:00 AM - 10:00 AM', '10:00 AM - 11:00 AM', '11:00 AM - 12:00 PM', '02:00 PM - 03:00 PM', '03:00 PM - 04:00 PM']
+    slots = [
+        '09:00 AM - 10:00 AM',
+        '10:00 AM - 11:00 AM',
+        '11:00 AM - 12:00 PM',
+        '02:00 PM - 03:00 PM',
+        '03:00 PM - 04:00 PM',
+    ]
+    is_donor_eligible = request.user.is_administrator or getattr(request.user, 'is_eligible', False)
     context = {
         'title': 'Book Donation Appointment',
         'locations': locations,
         'slots': slots,
+        'is_eligible': is_donor_eligible,
     }
     return render(request, 'appointments/book.html', context)
