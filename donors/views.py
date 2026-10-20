@@ -1,12 +1,13 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+from accounts.models import User
+from accounts.rbac import role_required
 
 
-@login_required
+@role_required(User.Role.DONOR, User.Role.ADMIN)
 def dashboard(request):
     """
-    Donor Dashboard (SRS 4.2: BBMS-F-006 to BBMS-F-008)
-    Displays profile summary, next eligible donation date, and recent history.
+    Donor Dashboard (SRS 4.2: BBMS-F-006 to BBMS-F-008).
+    Accessible by Donors and Administrators.
     """
     context = {
         'title': 'Donor Dashboard',
@@ -18,7 +19,7 @@ def dashboard(request):
     return render(request, 'donors/dashboard.html', context)
 
 
-@login_required
+@role_required(User.Role.DONOR, User.Role.ADMIN)
 def donation_history(request):
     """
     View donation history including Bag IDs, dates, and locations (SRS 4.2: BBMS-F-007).
@@ -30,7 +31,7 @@ def donation_history(request):
     return render(request, 'donors/history.html', context)
 
 
-@login_required
+@role_required(User.Role.DONOR, User.Role.ADMIN)
 def eligibility_check(request):
     """
     Medical eligibility questionnaire skeleton (SRS 4.3: BBMS-F-009, BBMS-F-010).
