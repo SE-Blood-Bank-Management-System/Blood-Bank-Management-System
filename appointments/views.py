@@ -1,11 +1,13 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+from accounts.models import User
+from accounts.rbac import role_required
 
 
-@login_required
+@role_required(User.Role.DONOR, User.Role.STAFF, User.Role.ADMIN)
 def appointment_list(request):
     """
-    List user appointments with options to reschedule/cancel (SRS 4.4: BBMS-F-014, BBMS-F-015).
+    List user appointments with options to reschedule/cancel.
+    SRS: 4.4 (BBMS-F-014, BBMS-F-015), 5.1.2 (BBMS-SR-003)
     """
     context = {
         'title': 'My Appointments',
@@ -14,10 +16,11 @@ def appointment_list(request):
     return render(request, 'appointments/list.html', context)
 
 
-@login_required
+@role_required(User.Role.DONOR, User.Role.ADMIN)
 def book_appointment(request):
     """
-    Book a donation appointment selecting date, time slot, and blood bank location (SRS 4.4: BBMS-F-012).
+    Book a donation appointment selecting date, time slot, and blood bank location.
+    SRS: 4.4 (BBMS-F-012), 5.1.2 (BBMS-SR-003)
     """
     locations = [
         {'id': 1, 'name': 'Central City Blood Bank', 'address': '101 Healthcare Blvd'},

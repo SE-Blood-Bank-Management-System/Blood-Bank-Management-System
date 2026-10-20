@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}403 Forbidden - BBMS{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6 text-center">
+      <div class="card shadow-sm border-0 p-4">
+        <div class="card-body">
+          <div class="mb-3 text-danger fs-1">
+            <i class="bi bi-shield-x"></i>
+          </div>
+          <h2 class="fw-bold mb-2">403 - Access Denied</h2>
+          <p class="text-muted">
+            You do not have permission to access this resource under your assigned role
+            <strong>({{ user.get_role_display|default:'Unauthenticated' }})</strong>.
+          </p>
+          <div class="alert alert-light border small text-start mb-4">
+            <i class="bi bi-shield-lock text-danger me-1"></i>
+            This access restriction is enforced by server-side Role-Based Access Control
+            (SRS Section 5.1.2: BBMS-SR-003).
+          </div>
+          <div class="d-flex justify-content-center gap-2">
+            <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-house me-1"></i>Return Home
+            </a>
+            {% if user.is_authenticated %}
+              {% if user.role == 'DONOR' %}
+                <a href="{% url 'donors:dashboard' %}" class="btn btn-danger">
+                  <i class="bi bi-speedometer2 me-1"></i>My Dashboard
+                </a>
+              {% elif user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
+                <a href="{% url 'inventory:dashboard' %}" class="btn btn-primary">
+                  <i class="bi bi-boxes me-1"></i>Inventory Dashboard
+                </a>
+              {% endif %}
+            {% else %}
+              <a href="{% url 'accounts:login' %}" class="btn btn-danger">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

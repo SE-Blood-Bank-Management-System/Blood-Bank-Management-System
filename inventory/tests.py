@@ -28,3 +28,13 @@ class InventoryViewTests(TestCase):
         res = self.client.get(reverse('inventory:quarantine'))
         self.assertEqual(res.status_code, 200)
         self.assertTemplateUsed(res, 'inventory/quarantine.html')
+
+    def test_inventory_views_reject_unauthorized_roles(self):
+        donor_user = User.objects.create_user(
+            username='donor_intruder',
+            password='testpassword',
+            role=User.Role.DONOR
+        )
+        self.client.login(username=donor_user.username, password='testpassword')
+        res = self.client.get(reverse('inventory:dashboard'))
+        self.assertEqual(res.status_code, 403)

@@ -28,3 +28,13 @@ class DonorViewTests(TestCase):
         eligibility_res = self.client.get(reverse('donors:eligibility'))
         self.assertEqual(eligibility_res.status_code, 200)
         self.assertTemplateUsed(eligibility_res, 'donors/eligibility.html')
+
+    def test_donor_views_reject_unauthorized_roles(self):
+        staff_user = User.objects.create_user(
+            username='staff_intruder',
+            password='testpassword',
+            role=User.Role.STAFF
+        )
+        self.client.login(username=staff_user.username, password='testpassword')
+        dashboard_res = self.client.get(reverse('donors:dashboard'))
+        self.assertEqual(dashboard_res.status_code, 403)

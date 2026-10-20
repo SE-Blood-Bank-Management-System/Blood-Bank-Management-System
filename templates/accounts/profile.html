@@ -6,7 +6,7 @@
 <div class="container">
   <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-      <div class="card shadow-sm border-0">
+      <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white border-bottom py-3">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="fw-bold mb-0"><i class="bi bi-person-badge text-danger me-2"></i>My Profile</h5>
@@ -24,8 +24,42 @@
             <dt class="col-sm-4 text-muted">Email Address</dt>
             <dd class="col-sm-8">{{ user.email|default:"Not specified" }}</dd>
 
-            <dt class="col-sm-4 text-muted">Phone Number</dt>
+            <dt class="col-sm-4 text-muted">Contact Phone</dt>
             <dd class="col-sm-8">{{ user.phone|default:"Not specified" }}</dd>
+
+            {% if user.is_donor %}
+              <dt class="col-sm-4 text-muted">Date of Birth</dt>
+              <dd class="col-sm-8">
+                {{ user.date_of_birth|default:"Not specified" }}
+                {% if user.age %}<span class="text-muted small">({{ user.age }} years old)</span>{% endif %}
+              </dd>
+
+              <dt class="col-sm-4 text-muted">Blood Group</dt>
+              <dd class="col-sm-8">
+                {% if user.blood_group %}
+                  <span class="badge bg-danger">{{ user.blood_group }}</span>
+                {% else %}
+                  <span class="text-muted">Not specified</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-sm-4 text-muted">Gender</dt>
+              <dd class="col-sm-8">{{ user.gender|default:"Not specified" }}</dd>
+            {% endif %}
+
+            {% if user.is_hospital %}
+              <dt class="col-sm-4 text-muted">Hospital Name</dt>
+              <dd class="col-sm-8">{{ user.hospital_name|default:"Not specified" }}</dd>
+
+              <dt class="col-sm-4 text-muted">License Number</dt>
+              <dd class="col-sm-8">{{ user.license_number|default:"Not specified" }}</dd>
+
+              <dt class="col-sm-4 text-muted">Contact Person</dt>
+              <dd class="col-sm-8">{{ user.contact_person|default:"Not specified" }}</dd>
+            {% endif %}
+
+            <dt class="col-sm-4 text-muted">Address</dt>
+            <dd class="col-sm-8">{{ user.address|default:"Not specified" }}</dd>
 
             <dt class="col-sm-4 text-muted">Assigned Role</dt>
             <dd class="col-sm-8"><span class="badge bg-danger">{{ user.get_role_display }}</span></dd>
@@ -43,7 +77,50 @@
             <dd class="col-sm-8">{{ user.date_joined|date:"d M Y, H:i" }}</dd>
           </dl>
         </div>
-        <div class="card-footer bg-light border-top d-flex justify-content-between">
+
+        {# Edit Profile Section (SRS BBMS-F-006) #}
+        <div class="card-body border-top bg-light p-4">
+          <h6 class="fw-bold mb-3"><i class="bi bi-pencil-square me-2 text-danger"></i>Update Profile Details (SRS BBMS-F-006)</h6>
+          <form method="post" action="{% url 'accounts:profile' %}">
+            {% csrf_token %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Contact Phone</label>
+                <input type="text" name="phone" value="{{ user.phone }}" class="form-control" placeholder="+91 9876543210">
+              </div>
+
+              {% if user.is_donor %}
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold small">Self-Reported Blood Group</label>
+                  <select name="blood_group" class="form-select">
+                    <option value="" {% if not user.blood_group %}selected{% endif %}>Unknown / Not sure</option>
+                    <option value="A+" {% if user.blood_group == 'A+' %}selected{% endif %}>A+</option>
+                    <option value="A-" {% if user.blood_group == 'A-' %}selected{% endif %}>A-</option>
+                    <option value="B+" {% if user.blood_group == 'B+' %}selected{% endif %}>B+</option>
+                    <option value="B-" {% if user.blood_group == 'B-' %}selected{% endif %}>B-</option>
+                    <option value="AB+" {% if user.blood_group == 'AB+' %}selected{% endif %}>AB+</option>
+                    <option value="AB-" {% if user.blood_group == 'AB-' %}selected{% endif %}>AB-</option>
+                    <option value="O+" {% if user.blood_group == 'O+' %}selected{% endif %}>O+</option>
+                    <option value="O-" {% if user.blood_group == 'O-' %}selected{% endif %}>O-</option>
+                  </select>
+                </div>
+              {% endif %}
+
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Address</label>
+                <textarea name="address" class="form-control" rows="2" placeholder="Address">{{ user.address }}</textarea>
+              </div>
+
+              <div class="col-12">
+                <button type="submit" class="btn btn-danger btn-sm px-3">
+                  <i class="bi bi-save me-1"></i>Save Changes
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-footer bg-white border-top d-flex justify-content-between">
           <a href="{% url 'core:home' %}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Back to Home
           </a>

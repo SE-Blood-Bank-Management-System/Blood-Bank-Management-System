@@ -1,13 +1,14 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+from accounts.models import User
+from accounts.rbac import role_required
 
 
-@login_required
+@role_required(User.Role.STAFF, User.Role.ADMIN)
 def inventory_dashboard(request):
     """
     Inventory management dashboard for staff and administrators.
     Displays units by blood group, component type, and FEFO expiry status.
-    SRS: 4.11 (BBMS-F-033, BBMS-F-034), 4.12 (BBMS-F-037 to BBMS-F-039)
+    SRS: 4.11 (BBMS-F-033, BBMS-F-034), 4.12 (BBMS-F-037 to BBMS-F-039), 5.1.2 (BBMS-SR-003)
     """
     blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
     components = ['Whole Blood', 'Red Blood Cells', 'Platelets', 'Fresh Frozen Plasma']
@@ -23,10 +24,11 @@ def inventory_dashboard(request):
     return render(request, 'inventory/dashboard.html', context)
 
 
-@login_required
+@role_required(User.Role.STAFF, User.Role.ADMIN)
 def quarantine_list(request):
     """
-    List units pending serology testing or under quarantine (SRS 4.8, 4.9: BBMS-F-026 to BBMS-F-030).
+    List units pending serology testing or under quarantine.
+    SRS: 4.8, 4.9 (BBMS-F-026 to BBMS-F-030), 5.1.2 (BBMS-SR-003)
     """
     context = {
         'title': 'Quarantine & Serology Testing',
