@@ -8,15 +8,29 @@ SRS References:
 - Section 5.1.2 (BBMS-SR-001, BBMS-SR-003): Security & RBAC Enforcement
 """
 import json
+from datetime import timedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from inventory.forms import BloodCollectionForm, BloodGroupCorrectionForm
-from inventory.models import BloodUnit, BloodUnitStatus, ComponentType
+from inventory.forms import (
+    BloodCollectionForm,
+    BloodGroupCorrectionForm,
+    SerologyPanelForm,
+)
+from inventory.models import (
+    BloodUnit,
+    BloodUnitStatus,
+    ComponentType,
+    REQUIRED_SEROLOGY_TESTS,
+    SerologyResult,
+    SerologyTest,
+    SerologyTestType,
+)
 
 
 class BloodUnitModelTests(TestCase):
@@ -729,4 +743,330 @@ class BloodCollectionTests(TestCase):
         self.assertTrue(data['bag_id'].startswith('BAG-'))
         self.assertEqual(data['unit_status'], BloodUnitStatus.QUARANTINED)
         self.assertEqual(data['blood_group'], BloodGroup.AB_POS)
+
+
+class SerologyQuarantineTests(TestCase):
+    """
+    Automated test suite for serology testing, quarantine transition rules, and RBAC guards.
+    SRS References:
+    - Section 4.8 (BBMS-F-024 to BBMS-F-027): Mandatory infection screening & outcomes
+    - Section 4.9 (BBMS-F-028 to BBMS-F-030): Quarantine controls, availability exclusion, audit
+    - Section 4.12 (BBMS-F-037): 42-day expiry date calculation upon becoming Available
+    - Section 5.1.2 (BBMS-SR-001, BBMS-SR-003): Staff role enforcement
+    Software Test Plan (STP) References:
+    - TC-SER-01: Serology quarantine and availability
+    - TC-SER-02: Serology result recording completeness
+    """
+    def setUp(self):
+        self.client = Client()
+        self.donor = User.objects.create_user(
+            username='donor_serology',
+            email='donor_serology@example.com',
+            password='password123',
+            role=User.Role.DONOR,
+            blood_group=BloodGroup.O_POS
+        )
+        self.staff = User.objects.create_user(
+            username='staff_serology',
+            email='staff_serology@example.com',
+            password='password123',
+            role=User.Role.STAFF
+        )
+        self.admin = User.objects.create_superuser(
+            username='admin_serology',
+            email='admin_serology@example.com',
+            password='password123'
+        )
+        self.hospital = User.objects.create_user(
+            username='hosp_serology',
+            email='hosp_serology@example.com',
+            password='password123',
+            role=User.Role.HOSPITAL,
+            is_approved=True
+        )
+
+        # Create standard collected blood unit
+        self.unit = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.O_POS,
+            component_type=ComponentType.WHOLE_BLOOD,
+            volume_ml=450,
+        )
+
+    def test_default_status_is_quarantined_upon_collection(self):
+        """A newly collected unit must have Quarantined status by default (BBMS-F-026)."""
+        self.assertEqual(self.unit.status, BloodUnitStatus.QUARANTINED)
+        self.assertTrue(self.unit.is_quarantined)
+        self.assertFalse(self.unit.is_available)
+        self.assertFalse(self.unit.is_discarded)
+        self.assertFalse(self.unit.has_passed_serology)
+
+    def test_tc_ser_01_serology_quarantine_and_availability(self):
+        """
+        TC-SER-01: Serology quarantine and availability
+        Test Steps per STP:
+        1. Record incomplete tests.
+        2. Verify unit remains quarantined.
+        3. Record all Pass results.
+        4. Verify status becomes Available.
+        5. Record a Fail for another unit -> verify status becomes Discarded.
+        """
+        # Step 1: Record incomplete tests (e.g., only HIV and Hepatitis B)
+        self.unit.record_serology_test(
+            test_type=SerologyTestType.HIV,
+            result=SerologyResult.PASS,
+            staff_user=self.staff
+        )
+        self.unit.record_serology_test(
+            test_type=SerologyTestType.HEPATITIS_B,
+            result=SerologyResult.PASS,
+            staff_user=self.staff
+        )
+        self.unit.refresh_from_db()
+
+        # Step 2: Verify unit remains Quarantined
+        self.assertEqual(self.unit.status, BloodUnitStatus.QUARANTINED)
+        self.assertFalse(self.unit.is_available)
+        self.assertFalse(self.unit.has_passed_serology)
+
+        # Step 3: Record all Pass results (complete the 4 required tests)
+        self.unit.record_serology_test(
+            test_type=SerologyTestType.HEPATITIS_C,
+            result=SerologyResult.PASS,
+            staff_user=self.staff
+        )
+        self.unit.record_serology_test(
+            test_type=SerologyTestType.SYPHILIS,
+            result=SerologyResult.PASS,
+            staff_user=self.staff
+        )
+        self.unit.refresh_from_db()
+
+        # Step 4: Verify status becomes Available and expiry is set (42 days for Whole Blood)
+        self.assertEqual(self.unit.status, BloodUnitStatus.AVAILABLE)
+        self.assertTrue(self.unit.is_available)
+        self.assertTrue(self.unit.has_passed_serology)
+        self.assertIsNotNone(self.unit.expiry_date)
+        # Expiry must be 42 days from collection date (BBMS-F-037)
+        expected_expiry = self.unit.collection_date + timedelta(days=42)
+        diff_seconds = abs((self.unit.expiry_date - expected_expiry).total_seconds())
+        self.assertLess(diff_seconds, 60)
+
+        # Step 5: Record a Fail for another unit -> verify Discarded
+        unit_failed = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.A_POS,
+            component_type=ComponentType.WHOLE_BLOOD,
+            volume_ml=450,
+        )
+        unit_failed.record_serology_test(
+            test_type=SerologyTestType.HIV,
+            result=SerologyResult.FAIL,
+            staff_user=self.staff
+        )
+        unit_failed.refresh_from_db()
+        self.assertEqual(unit_failed.status, BloodUnitStatus.DISCARDED)
+        self.assertTrue(unit_failed.is_discarded)
+        self.assertFalse(unit_failed.is_available)
+
+    def test_tc_ser_02_serology_result_recording_completeness(self):
+        """
+        TC-SER-02: Serology result recording completeness
+        Verify each required serology test accepts Pass/Fail and incomplete test sets cannot make a unit Available.
+        """
+        # Step 1: Incomplete panel (3 of 4 tests recorded as Pass)
+        panel_partial = {
+            SerologyTestType.HIV: SerologyResult.PASS,
+            SerologyTestType.HEPATITIS_B: SerologyResult.PASS,
+            SerologyTestType.HEPATITIS_C: SerologyResult.PASS,
+        }
+        self.unit.record_serology_panel(panel_partial, staff_user=self.staff)
+        self.unit.refresh_from_db()
+
+        # Step 2: Verify status is still Quarantined
+        self.assertEqual(self.unit.status, BloodUnitStatus.QUARANTINED)
+
+        # Step 3: Enter complete Pass panel
+        panel_all_pass = {
+            SerologyTestType.HIV: SerologyResult.PASS,
+            SerologyTestType.HEPATITIS_B: SerologyResult.PASS,
+            SerologyTestType.HEPATITIS_C: SerologyResult.PASS,
+            SerologyTestType.SYPHILIS: SerologyResult.PASS,
+        }
+        self.unit.record_serology_panel(panel_all_pass, staff_user=self.staff)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.status, BloodUnitStatus.AVAILABLE)
+
+        # Step 4: Repeat with a mixed panel containing one Fail -> must transition to Discarded
+        unit2 = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.B_POS,
+        )
+        panel_with_fail = {
+            SerologyTestType.HIV: SerologyResult.PASS,
+            SerologyTestType.HEPATITIS_B: SerologyResult.FAIL,
+            SerologyTestType.HEPATITIS_C: SerologyResult.PASS,
+            SerologyTestType.SYPHILIS: SerologyResult.PASS,
+        }
+        unit2.record_serology_panel(panel_with_fail, staff_user=self.staff)
+        unit2.refresh_from_db()
+        self.assertEqual(unit2.status, BloodUnitStatus.DISCARDED)
+
+    def test_quarantined_and_discarded_units_excluded_from_available_inventory(self):
+        """Verify Quarantined and Discarded units are excluded from available inventory (BBMS-F-028)."""
+        # Initially self.unit is Quarantined
+        available_ids = list(BloodUnit.objects.available().values_list('id', flat=True))
+        self.assertNotIn(self.unit.id, available_ids)
+
+        # Once all tests pass, it must be included
+        panel_pass = {t: SerologyResult.PASS for t in REQUIRED_SEROLOGY_TESTS}
+        self.unit.record_serology_panel(panel_pass, staff_user=self.staff)
+        available_ids = list(BloodUnit.objects.available().values_list('id', flat=True))
+        self.assertIn(self.unit.id, available_ids)
+
+        # If later discarded, it must be excluded
+        self.unit.record_serology_test(SerologyTestType.HIV, SerologyResult.FAIL, staff_user=self.staff)
+        available_ids = list(BloodUnit.objects.available().values_list('id', flat=True))
+        self.assertNotIn(self.unit.id, available_ids)
+
+    def test_status_transition_audit_logging(self):
+        """Status change to/from Quarantined records staff username and timestamp (BBMS-F-029)."""
+        panel_pass = {t: SerologyResult.PASS for t in REQUIRED_SEROLOGY_TESTS}
+        self.unit.record_serology_panel(panel_pass, staff_user=self.staff)
+        self.unit.refresh_from_db()
+
+        self.assertIn("Status transitioned from 'Quarantined' to 'Available'", self.unit.status_audit_log)
+        self.assertIn("staff_serology", self.unit.status_audit_log)
+
+    def test_quarantine_duration_calculation(self):
+        """Quarantine duration calculation is populated for quarantined units (BBMS-F-030)."""
+        # Quarantined unit has non-None quarantine duration
+        self.assertIsNotNone(self.unit.quarantine_duration_days)
+        self.assertGreaterEqual(self.unit.quarantine_duration_days, 0)
+
+        # Once Available, quarantine_duration_days is None
+        panel_pass = {t: SerologyResult.PASS for t in REQUIRED_SEROLOGY_TESTS}
+        self.unit.record_serology_panel(panel_pass, staff_user=self.staff)
+        self.assertIsNone(self.unit.quarantine_duration_days)
+
+    def test_platelets_expiry_calculation(self):
+        """Platelet unit expiry is 5 days from collection upon becoming Available (BBMS-F-037)."""
+        unit_plt = BloodUnit.record_collection(
+            staff_user=self.staff,
+            donor=self.donor,
+            blood_group=BloodGroup.AB_POS,
+            component_type=ComponentType.PLATELETS,
+            volume_ml=250,
+        )
+        panel_pass = {t: SerologyResult.PASS for t in REQUIRED_SEROLOGY_TESTS}
+        unit_plt.record_serology_panel(panel_pass, staff_user=self.staff)
+        unit_plt.refresh_from_db()
+
+        self.assertEqual(unit_plt.status, BloodUnitStatus.AVAILABLE)
+        expected_expiry = unit_plt.collection_date + timedelta(days=5)
+        diff_seconds = abs((unit_plt.expiry_date - expected_expiry).total_seconds())
+        self.assertLess(diff_seconds, 60)
+
+    def test_manual_status_bypass_prevented_by_validation_guard(self):
+        """Validation guard prevents marking unit Available without all passing tests (BBMS-F-026)."""
+        # Unit is Quarantined with 0 tests
+        self.unit.status = BloodUnitStatus.AVAILABLE
+        with self.assertRaises(ValidationError):
+            self.unit.clean()
+
+        # Unit with a failed test cannot be changed to Available or Quarantined (BBMS-F-027)
+        self.unit.status = BloodUnitStatus.QUARANTINED
+        self.unit.record_serology_test(SerologyTestType.HIV, SerologyResult.FAIL, staff_user=self.staff)
+        self.unit.status = BloodUnitStatus.AVAILABLE
+        with self.assertRaises(ValidationError):
+            self.unit.clean()
+
+    def test_rbac_unauthorized_users_cannot_record_serology(self):
+        """Donors and Hospital accounts cannot record serology results (BBMS-SR-003)."""
+        # Donor cannot call model method directly
+        with self.assertRaises(PermissionDenied):
+            self.unit.record_serology_test(
+                test_type=SerologyTestType.HIV,
+                result=SerologyResult.PASS,
+                staff_user=self.donor
+            )
+
+        # Donor cannot POST via HTTP view
+        self.client.login(username=self.donor.username, password='password123')
+        res = self.client.post(
+            reverse('inventory:record_serology', kwargs={'bag_id': self.unit.bag_id}),
+            {'hiv': 'Pass'}
+        )
+        self.assertEqual(res.status_code, 403)
+
+        # Hospital user cannot POST via HTTP view
+        self.client.login(username=self.hospital.username, password='password123')
+        res = self.client.post(
+            reverse('inventory:record_serology', kwargs={'bag_id': self.unit.bag_id}),
+            {'hiv': 'Pass'}
+        )
+        self.assertEqual(res.status_code, 403)
+
+    def test_rest_api_serology_endpoint_success_and_failure(self):
+        """REST API POST records tests and returns 200 with updated unit status (SAD Section 4.3)."""
+        self.client.login(username=self.staff.username, password='password123')
+
+        # 1. Successful complete 4-pass panel
+        api_payload = {
+            'tests': {
+                'HIV': 'Pass',
+                'Hepatitis B': 'Pass',
+                'Hepatitis C': 'Pass',
+                'Syphilis': 'Pass',
+            },
+            'notes': 'Automated analyzer run #402.'
+        }
+        res = self.client.post(
+            f"/api/blood-units/{self.unit.bag_id}/serology/",
+            data=json.dumps(api_payload),
+            content_type='application/json',
+            HTTP_ACCEPT='application/json'
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['unit_status'], BloodUnitStatus.AVAILABLE)
+        self.assertTrue(data['is_available'])
+        self.assertIsNotNone(data['expiry_date'])
+        self.assertEqual(data['serology_tests']['HIV']['result'], 'Pass')
+
+        # 2. Failing test via API transitions unit to Discarded
+        fail_payload = {'tests': {'HIV': 'Fail'}}
+        res_fail = self.client.post(
+            f"/api/blood-units/{self.unit.bag_id}/serology/",
+            data=json.dumps(fail_payload),
+            content_type='application/json',
+            HTTP_ACCEPT='application/json'
+        )
+        self.assertEqual(res_fail.status_code, 200)
+        data_fail = res_fail.json()
+        self.assertEqual(data_fail['unit_status'], BloodUnitStatus.DISCARDED)
+        self.assertTrue(data_fail['is_discarded'])
+
+    def test_html_form_serology_submission(self):
+        """Staff HTML form POST records serology and redirects to unit detail with success flash."""
+        self.client.login(username=self.staff.username, password='password123')
+        post_data = {
+            'hiv': 'Pass',
+            'hepatitis_b': 'Pass',
+            'hepatitis_c': 'Pass',
+            'syphilis': 'Pass',
+            'notes': 'Form testing batch.',
+        }
+        res = self.client.post(
+            reverse('inventory:record_serology', kwargs={'bag_id': self.unit.bag_id}),
+            data=post_data
+        )
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.status, BloodUnitStatus.AVAILABLE)
+        self.assertRedirects(res, reverse('inventory:unit_detail', kwargs={'bag_id': self.unit.bag_id}))
+
 

@@ -19,8 +19,14 @@ from django.views.decorators.http import require_http_methods
 from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from .forms import BloodCollectionForm, BloodGroupCorrectionForm
-from .models import BloodUnit, BloodUnitStatus, ComponentType
+from .forms import BloodCollectionForm, BloodGroupCorrectionForm, SerologyPanelForm
+from .models import (
+    BloodUnit,
+    BloodUnitStatus,
+    ComponentType,
+    SerologyResult,
+    SerologyTestType,
+)
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)
@@ -100,15 +106,18 @@ def blood_unit_detail(request, bag_id):
     laboratory-confirmed blood group (SRS BBMS-F-022, BBMS-F-023).
     """
     unit = get_object_or_404(
-        BloodUnit.objects.select_related('donor', 'lab_confirmed_by', 'parent_unit'),
+        BloodUnit.objects.select_related('donor', 'lab_confirmed_by', 'parent_unit')
+        .prefetch_related('serology_tests'),
         bag_id=bag_id
     )
     form = BloodGroupCorrectionForm(initial={'blood_group': unit.blood_group})
+    serology_form = SerologyPanelForm(blood_unit=unit)
 
     context = {
         'title': f"Blood Unit {unit.bag_id}",
         'unit': unit,
         'form': form,
+        'serology_form': serology_form,
     }
     return render(request, 'inventory/unit_detail.html', context)
 
@@ -263,4 +272,114 @@ def record_blood_collection(request):
         'donor_count': donor_count,
     }
     return render(request, 'inventory/record_collection.html', context)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["GET", "POST"])
+def record_serology_tests(request, bag_id):
+    """
+    Staff view and API endpoint to record serology test outcomes (HIV, Hep B, Hep C, Syphilis)
+    and execute automatic quarantine status transitions (SRS BBMS-F-024 to BBMS-F-027).
+    """
+    unit = get_object_or_404(
+        BloodUnit,
+        bag_id=bag_id
+    )
+
+    if request.method == 'GET':
+        return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+
+    is_api = _is_api_request(request) or request.content_type == 'application/json'
+
+    if is_api:
+        try:
+            body = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
+
+        # Handle both nested 'tests' dict and top-level test fields
+        tests_payload = body.get('tests')
+        if not tests_payload or not isinstance(tests_payload, dict):
+            tests_payload = {}
+            for key, val in body.items():
+                if key in ('notes', 'csrfmiddlewaretoken'):
+                    continue
+                k_clean = str(key).strip()
+                k_lower = k_clean.lower()
+                if k_lower in ('hiv', 'hiv 1/2'):
+                    tests_payload[SerologyTestType.HIV] = val
+                elif k_lower in ('hepatitis b', 'hepatitis_b', 'hep_b', 'hbsag'):
+                    tests_payload[SerologyTestType.HEPATITIS_B] = val
+                elif k_lower in ('hepatitis c', 'hepatitis_c', 'hep_c', 'hcv'):
+                    tests_payload[SerologyTestType.HEPATITIS_C] = val
+                elif k_lower in ('syphilis', 'vdrl', 'rpr'):
+                    tests_payload[SerologyTestType.SYPHILIS] = val
+                elif k_clean in SerologyTestType.values:
+                    tests_payload[k_clean] = val
+
+        if not tests_payload:
+            return JsonResponse({'error': 'No serology test results provided in payload.'}, status=400)
+
+        notes = body.get('notes', '')
+        try:
+            unit.record_serology_panel(tests_payload, staff_user=request.user, notes=notes)
+            unit.refresh_from_db()
+        except ValidationError as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f"Serology test results recorded for unit {unit.bag_id}. Current status: {unit.status}.",
+            'bag_id': unit.bag_id,
+            'unit_status': unit.status,
+            'is_available': unit.is_available,
+            'is_discarded': unit.is_discarded,
+            'is_quarantined': unit.is_quarantined,
+            'expiry_date': unit.expiry_date.isoformat() if unit.expiry_date else None,
+            'serology_tests': unit.serology_summary,
+        }, status=200)
+
+    # HTML Form submission
+    form = SerologyPanelForm(request.POST, blood_unit=unit)
+    if form.is_valid():
+        try:
+            form.save(unit, staff_user=request.user)
+            unit.refresh_from_db()
+            if unit.is_available:
+                messages.success(
+                    request,
+                    f"All serology tests passed! Unit {unit.bag_id} is now Available for use. "
+                    f"Expiry set to {unit.expiry_date.strftime('%d %b %Y')} (SRS BBMS-F-026, BBMS-F-037)."
+                )
+            elif unit.is_discarded:
+                messages.warning(
+                    request,
+                    f"Serology failure recorded! Unit {unit.bag_id} has been marked Discarded and removed "
+                    f"from usable inventory (SRS BBMS-F-027, BBMS-F-028)."
+                )
+            else:
+                messages.info(
+                    request,
+                    f"Serology test results saved for unit {unit.bag_id}. Unit remains Quarantined until all "
+                    f"four mandatory tests pass (SRS BBMS-F-024, BBMS-F-026)."
+                )
+            return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+        except ValidationError as e:
+            messages.error(request, str(e))
+            return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+    else:
+        messages.error(request, "Please correct the errors in the serology testing form.")
+        return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["POST"])
+def api_record_serology(request, bag_id):
+    """
+    Dedicated REST API endpoint for recording required serology test results.
+    SAD Section 4.3: POST /api/blood-units/{bagId}/serology (Staff role)
+    SRS BBMS-F-024 to BBMS-F-027, BBMS-SR-003.
+    """
+    return record_serology_tests(request, bag_id)
+
 
