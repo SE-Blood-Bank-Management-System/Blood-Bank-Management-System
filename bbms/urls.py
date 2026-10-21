@@ -12,6 +12,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from appointments import views as appointment_views
 from inventory import views as inventory_views
 
 urlpatterns = [
@@ -26,6 +27,21 @@ urlpatterns = [
         'api/blood-units/<str:bag_id>/blood-group/',
         inventory_views.api_update_unit_blood_group,
         name='api_blood_unit_blood_group'
+    ),
+    path(
+        'api/appointments/slots/',
+        appointment_views.api_slots,
+        name='api_root_appointment_slots'
+    ),
+    path(
+        'api/appointments/',
+        appointment_views.api_appointments,
+        name='api_root_appointments'
+    ),
+    path(
+        'api/appointments/<int:pk>/',
+        appointment_views.api_appointment_detail,
+        name='api_root_appointment_detail'
     ),
 ]
 
