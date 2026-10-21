@@ -282,7 +282,7 @@ def record_serology_tests(request, bag_id):
     and execute automatic quarantine status transitions (SRS BBMS-F-024 to BBMS-F-027).
     """
     unit = get_object_or_404(
-        BloodUnit.objects.prefetch_related('serology_tests'),
+        BloodUnit,
         bag_id=bag_id
     )
 
@@ -323,6 +323,7 @@ def record_serology_tests(request, bag_id):
         notes = body.get('notes', '')
         try:
             unit.record_serology_panel(tests_payload, staff_user=request.user, notes=notes)
+            unit.refresh_from_db()
         except ValidationError as e:
             return JsonResponse({'error': str(e)}, status=400)
 
@@ -343,6 +344,7 @@ def record_serology_tests(request, bag_id):
     if form.is_valid():
         try:
             form.save(unit, staff_user=request.user)
+            unit.refresh_from_db()
             if unit.is_available:
                 messages.success(
                     request,

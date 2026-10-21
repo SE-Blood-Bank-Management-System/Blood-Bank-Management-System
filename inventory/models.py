@@ -346,6 +346,8 @@ class BloodUnit(models.Model):
         """
         if not self.pk:
             return False
+        if hasattr(self, '_prefetched_objects_cache') and 'serology_tests' in self._prefetched_objects_cache:
+            del self._prefetched_objects_cache['serology_tests']
         tests = {t.test_type: t.result for t in self.serology_tests.all()}
         return (
             all(req in tests for req in REQUIRED_SEROLOGY_TESTS) and
@@ -355,6 +357,8 @@ class BloodUnit(models.Model):
     @property
     def serology_summary(self):
         """Returns structured dictionary of serology test statuses for templates/APIs."""
+        if hasattr(self, '_prefetched_objects_cache') and 'serology_tests' in self._prefetched_objects_cache:
+            del self._prefetched_objects_cache['serology_tests']
         existing = {t.test_type: t for t in self.serology_tests.all()} if self.pk else {}
         summary = {}
         for req in REQUIRED_SEROLOGY_TESTS:
@@ -403,6 +407,8 @@ class BloodUnit(models.Model):
             validate_blood_group(self.blood_group)
 
         if self.pk:
+            if hasattr(self, '_prefetched_objects_cache') and 'serology_tests' in self._prefetched_objects_cache:
+                del self._prefetched_objects_cache['serology_tests']
             has_failed_tests = self.serology_tests.filter(result=SerologyResult.FAIL).exists()
             if has_failed_tests and self.status != BloodUnitStatus.DISCARDED:
                 raise ValidationError(
@@ -460,6 +466,8 @@ class BloodUnit(models.Model):
         if not self.pk:
             return self.status, "Unit must be saved before evaluating serology status."
 
+        if hasattr(self, '_prefetched_objects_cache') and 'serology_tests' in self._prefetched_objects_cache:
+            del self._prefetched_objects_cache['serology_tests']
         tests = {t.test_type: t.result for t in self.serology_tests.all()}
         old_status = self.status
 
