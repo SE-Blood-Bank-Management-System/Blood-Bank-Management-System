@@ -124,9 +124,12 @@
           <a href="{% url 'core:home' %}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Back to Home
           </a>
-          <a href="{% url 'accounts:logout' %}" class="btn btn-outline-danger btn-sm">
-            <i class="bi bi-box-arrow-right me-1"></i>Logout
-          </a>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-box-arrow-right me-1"></i>Logout
+            </button>
+          </form>
         </div>
       </div>
     </div>

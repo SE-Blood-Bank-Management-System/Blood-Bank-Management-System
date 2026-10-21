@@ -2,11 +2,27 @@ import re
 from uuid import uuid4
 
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from .models import User
+
+
+class LoginForm(AuthenticationForm):
+    username = forms.CharField(label='Email or username', max_length=254)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Email is longer than AbstractUser.username, but uses the same login field.
+        self.fields['username'].max_length = 254
+        self.fields['username'].widget.attrs['maxlength'] = 254
+
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if not user.is_approved:
+            raise forms.ValidationError('Your account is pending administrator approval.', code='unapproved')
 
 
 class DonorRegistrationForm(forms.ModelForm):

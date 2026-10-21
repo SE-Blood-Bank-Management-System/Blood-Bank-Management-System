@@ -18,10 +18,12 @@ class EmailOrUsernameModelBackend(ModelBackend):
 
         clean_username = username.strip()
         try:
-            user = user_model.objects.filter(
+            user = user_model.objects.get(
                 Q(username__iexact=clean_username) | Q(email__iexact=clean_username)
-            ).first()
-        except Exception:
+            )
+        except (user_model.DoesNotExist, user_model.MultipleObjectsReturned):
+            # Match password-hashing cost for unknown or ambiguous identifiers.
+            user_model().set_password(password)
             return None
 
         if user and user.check_password(password) and self.user_can_authenticate(user):

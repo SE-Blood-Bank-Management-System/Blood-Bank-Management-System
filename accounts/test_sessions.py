@@ -85,7 +85,10 @@ class SecureSessionTests(TestCase):
         self.assertEqual(browser.post(self.logout_url, secure=True).status_code, 403)
         page = browser.get(self.protected_url, secure=True)
         token = page.cookies[settings.CSRF_COOKIE_NAME].value
-        response = browser.post(self.logout_url, {'csrfmiddlewaretoken': token}, secure=True)
+        response = browser.post(
+            self.logout_url, {'csrfmiddlewaretoken': token}, secure=True,
+            HTTP_REFERER='https://testserver' + self.protected_url,
+        )
         self.assertRedirects(response, reverse('core:home'))
 
     def test_login_rotates_preexisting_session_key(self):
