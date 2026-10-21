@@ -1,42 +1,36 @@
 from django.contrib import messages
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm
 from django.db import IntegrityError
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
-from .forms import DonorRegistrationForm, HospitalRegistrationForm, UserProfileUpdateForm
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_POST
+from .forms import DonorRegistrationForm, HospitalRegistrationForm, LoginForm, UserProfileUpdateForm
 from .models import User
 
 
+@never_cache
+@require_http_methods(['GET', 'POST'])
 def login_view(request):
     """
     User login supporting all BBMS roles (Donor, Hospital, Staff, Admin)
     with authentication by either username or email and role-directed redirection.
-    SRS: 4.1 (BBMS-F-004), 4.13 (BBMS-F-041), 4.20 (BBMS-F-063), 5.1.2 (BBMS-SR-001, BBMS-SR-007).
+    SRS: 4.1 (BBMS-F-004), 4.13 (BBMS-F-041), 4.20 (BBMS-F-063), 5.1.2 (BBMS-SR-001, BBMS-SR-006).
     """
     if request.user.is_authenticated:
         return redirect('core:home')
 
+    next_url = request.POST.get('next') or request.GET.get('next', '')
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = ''
+
     if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
+        form = LoginForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-
-            # Account status checks
-            if not user.is_active:
-                messages.error(
-                    request,
-                    'Your account has been deactivated. Please contact an administrator (SRS BBMS-F-063).'
-                )
-                return render(request, 'accounts/login.html', {'form': form})
-
-            if not user.is_approved:
-                messages.error(
-                    request,
-                    'Your account is pending administrator approval before activation (SRS BBMS-F-040, BBMS-F-042).'
-                )
-                return render(request, 'accounts/login.html', {'form': form})
 
             login(request, user)
             messages.success(
@@ -45,8 +39,7 @@ def login_view(request):
             )
 
             # Redirect handling: safe next parameter, else role dashboard
-            next_url = request.POST.get('next') or request.GET.get('next')
-            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            if next_url:
                 return redirect(next_url)
 
             if user.is_donor:
@@ -60,11 +53,13 @@ def login_view(request):
         else:
             messages.error(request, 'Invalid email/username or password.')
     else:
-        form = AuthenticationForm(request)
+        form = LoginForm(request)
 
-    return render(request, 'accounts/login.html', {'form': form})
+    return render(request, 'accounts/login.html', {'form': form, 'next': next_url})
 
 
+@never_cache
+@require_POST
 def logout_view(request):
     """
     Logs out the authenticated user and invalidates session.

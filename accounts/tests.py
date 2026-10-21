@@ -503,7 +503,7 @@ class AuthenticationAndSessionTests(TestCase):
 
     def test_logout_clears_session(self):
         self.client.login(username='donor_auth', password='AuthPassword123!')
-        response = self.client.get(reverse('accounts:logout'), follow=True)
+        response = self.client.post(reverse('accounts:logout'), follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertFalse('_auth_user_id' in self.client.session)
 
