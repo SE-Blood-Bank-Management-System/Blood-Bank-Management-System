@@ -53,6 +53,33 @@ COMPONENT_SHELF_LIFE_DAYS = {
 }
 
 
+class SerologyTestType(models.TextChoices):
+    """
+    Standard mandatory serology infection test types per SRS BBMS-F-024.
+    Every unit must be tested for HIV, Hepatitis B, Hepatitis C, and Syphilis.
+    """
+    HIV = 'HIV', 'HIV'
+    HEPATITIS_B = 'Hepatitis B', 'Hepatitis B'
+    HEPATITIS_C = 'Hepatitis C', 'Hepatitis C'
+    SYPHILIS = 'Syphilis', 'Syphilis'
+
+
+REQUIRED_SEROLOGY_TESTS = [
+    SerologyTestType.HIV,
+    SerologyTestType.HEPATITIS_B,
+    SerologyTestType.HEPATITIS_C,
+    SerologyTestType.SYPHILIS,
+]
+
+
+class SerologyResult(models.TextChoices):
+    """
+    Serology test outcomes per SRS BBMS-F-025.
+    """
+    PASS = 'Pass', 'Pass'
+    FAIL = 'Fail', 'Fail'
+
+
 class BloodUnit(models.Model):
     """
     Represents a collected blood bag / unit.
@@ -150,6 +177,10 @@ class BloodUnit(models.Model):
     blood_group_notes = models.TextField(
         blank=True,
         help_text='Staff rationale or notes on blood group determination/correction (SRS BBMS-F-023)'
+    )
+    status_audit_log = models.TextField(
+        blank=True,
+        help_text='Audit log of status transitions and serology outcomes (SRS BBMS-F-029)'
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -362,3 +393,55 @@ class BloodUnit(models.Model):
     def __str__(self):
         bg = self.blood_group or "Pending"
         return f"{self.bag_id} ({bg}) - {self.component_type} [{self.status}]"
+
+
+class SerologyTest(models.Model):
+    """
+    Stores individual serology / infection test result for a blood unit.
+    SRS References:
+    - BBMS-F-024: Mandatory serology testing for HIV, Hepatitis B, Hepatitis C, Syphilis.
+    - BBMS-F-025: Pass/Fail recording per test.
+    - BBMS-F-029: Staff audit identity and timestamp.
+    """
+    blood_unit = models.ForeignKey(
+        BloodUnit,
+        on_delete=models.CASCADE,
+        related_name='serology_tests',
+        help_text='Blood unit tested (SRS BBMS-F-024)'
+    )
+    test_type = models.CharField(
+        max_length=20,
+        choices=SerologyTestType.choices,
+        help_text='Specific serological screening assay (SRS BBMS-F-024)'
+    )
+    result = models.CharField(
+        max_length=10,
+        choices=SerologyResult.choices,
+        help_text='Test outcome: Pass or Fail (SRS BBMS-F-025)'
+    )
+    tested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conducted_serology_tests',
+        help_text='Authorized staff member who conducted or recorded the test (SRS BBMS-F-029)'
+    )
+    tested_at = models.DateTimeField(
+        default=timezone.now,
+        help_text='Timestamp when test result was recorded (SRS BBMS-F-029)'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Laboratory notes or assay optical density / reagent kit details'
+    )
+
+    class Meta:
+        ordering = ['blood_unit', 'test_type']
+        unique_together = [('blood_unit', 'test_type')]
+        verbose_name = 'Serology Test'
+        verbose_name_plural = 'Serology Tests'
+
+    def __str__(self):
+        return f"{self.blood_unit.bag_id} - {self.test_type}: {self.result}"
+
