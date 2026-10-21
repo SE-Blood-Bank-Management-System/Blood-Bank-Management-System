@@ -29,6 +29,12 @@ urlpatterns = [
         name='api_blood_unit_blood_group'
     ),
     path(
+        'api/blood-units/<str:bag_id>/serology/',
+        inventory_views.api_record_serology,
+        name='api_blood_unit_serology'
+    ),
+
+    path(
         'api/appointments/slots/',
         appointment_views.api_slots,
         name='api_root_appointment_slots'

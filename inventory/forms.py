@@ -160,3 +160,108 @@ class BloodCollectionForm(forms.ModelForm):
             instance.save()
         return instance
 
+
+class SerologyPanelForm(forms.Form):
+    """
+    Form allowing authorized blood bank staff to record serology test outcomes
+    for the mandatory infection markers (HIV, Hepatitis B, Hepatitis C, Syphilis).
+    SRS References:
+    - BBMS-F-024: Mandatory serology testing before Available.
+    - BBMS-F-025: Pass/Fail recording for each test.
+    - BBMS-F-026: Defaults to Quarantined; Available on all Pass.
+    - BBMS-F-027: Discarded on any Fail.
+    """
+    CHOICES = [
+        ('', '-- Select Outcome --'),
+        ('Pass', 'Pass (Non-reactive / Negative)'),
+        ('Fail', 'Fail (Reactive / Positive)'),
+    ]
+
+    hiv = forms.ChoiceField(
+        choices=CHOICES,
+        required=False,
+        label="HIV 1/2 Screening",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_serology_hiv',
+        }),
+        help_text="Human Immunodeficiency Virus antibodies / p24 antigen assay (SRS BBMS-F-024)."
+    )
+    hepatitis_b = forms.ChoiceField(
+        choices=CHOICES,
+        required=False,
+        label="Hepatitis B (HBsAg)",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_serology_hep_b',
+        }),
+        help_text="Hepatitis B surface antigen serological screening (SRS BBMS-F-024)."
+    )
+    hepatitis_c = forms.ChoiceField(
+        choices=CHOICES,
+        required=False,
+        label="Hepatitis C (Anti-HCV)",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_serology_hep_c',
+        }),
+        help_text="Hepatitis C virus antibodies enzyme immunoassay (SRS BBMS-F-024)."
+    )
+    syphilis = forms.ChoiceField(
+        choices=CHOICES,
+        required=False,
+        label="Syphilis (Treponema / VDRL / RPR)",
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_serology_syphilis',
+        }),
+        help_text="Treponema pallidum / non-treponemal serological test (SRS BBMS-F-024)."
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Laboratory Notes / Reagent Batch",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Optional testing kit lot number, optical density readings, or lab remarks.',
+            'id': 'id_serology_notes',
+        }),
+        help_text="Audit notes recorded with this testing session (SRS BBMS-F-029)."
+    )
+
+    def __init__(self, *args, blood_unit=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.blood_unit = blood_unit
+        if blood_unit and not self.is_bound:
+            existing = {t.test_type: t.result for t in blood_unit.serology_tests.all()}
+            from .models import SerologyTestType
+            if SerologyTestType.HIV in existing:
+                self.fields['hiv'].initial = existing[SerologyTestType.HIV]
+            if SerologyTestType.HEPATITIS_B in existing:
+                self.fields['hepatitis_b'].initial = existing[SerologyTestType.HEPATITIS_B]
+            if SerologyTestType.HEPATITIS_C in existing:
+                self.fields['hepatitis_c'].initial = existing[SerologyTestType.HEPATITIS_C]
+            if SerologyTestType.SYPHILIS in existing:
+                self.fields['syphilis'].initial = existing[SerologyTestType.SYPHILIS]
+
+    def save(self, blood_unit, staff_user=None):
+        """
+        Records the entered serology results on the blood unit and evaluates status.
+        """
+        from .models import SerologyTestType
+        data = self.cleaned_data
+        panel = {}
+        if data.get('hiv'):
+            panel[SerologyTestType.HIV] = data['hiv']
+        if data.get('hepatitis_b'):
+            panel[SerologyTestType.HEPATITIS_B] = data['hepatitis_b']
+        if data.get('hepatitis_c'):
+            panel[SerologyTestType.HEPATITIS_C] = data['hepatitis_c']
+        if data.get('syphilis'):
+            panel[SerologyTestType.SYPHILIS] = data['syphilis']
+
+        notes = data.get('notes', '')
+        blood_unit.record_serology_panel(panel, staff_user=staff_user, notes=notes)
+        return blood_unit
+
+

@@ -13,4 +13,7 @@ urlpatterns = [
     path('quarantine/', views.quarantine_list, name='quarantine'),
     path('blood-units/<str:bag_id>/', views.blood_unit_detail, name='unit_detail'),
     path('blood-units/<str:bag_id>/blood-group/', views.update_unit_blood_group, name='update_blood_group'),
+    path('blood-units/<str:bag_id>/serology/', views.record_serology_tests, name='record_serology'),
+    path('api/blood-units/<str:bag_id>/serology/', views.api_record_serology, name='api_record_serology'),
 ]
+
