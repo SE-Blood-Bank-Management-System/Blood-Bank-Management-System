@@ -19,7 +19,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from .forms import BloodGroupCorrectionForm
+from .forms import BloodCollectionForm, BloodGroupCorrectionForm
 from .models import BloodUnit, BloodUnitStatus, ComponentType
 
 
@@ -188,3 +188,79 @@ def api_update_unit_blood_group(request, bag_id):
     SRS BBMS-F-022, BBMS-F-023, BBMS-SR-003.
     """
     return update_unit_blood_group(request, bag_id)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+def record_blood_collection(request):
+    """
+    Interface and endpoint for authorized staff to record completed blood collections.
+    SRS BBMS-F-017, BBMS-F-018, BBMS-F-019, BBMS-F-020, BBMS-F-021, BBMS-F-026.
+    """
+    is_api = _is_api_request(request)
+
+    if request.method == 'POST':
+        # Support JSON payload for API callers
+        if request.content_type == 'application/json' and request.body:
+            try:
+                data = json.loads(request.body.decode('utf-8'))
+            except json.JSONDecodeError:
+                return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
+            form = BloodCollectionForm(data)
+        else:
+            form = BloodCollectionForm(request.POST)
+
+        if form.is_valid():
+            unit = form.save(staff_user=request.user)
+            success_msg = f"Blood collection recorded successfully! Generated unique Bag ID: {unit.bag_id}"
+
+            if is_api:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': success_msg,
+                    'bag_id': unit.bag_id,
+                    'donor_id': unit.donor_id,
+                    'donor_username': unit.donor.username if unit.donor else None,
+                    'blood_group': unit.blood_group,
+                    'component_type': unit.component_type,
+                    'volume_ml': unit.volume_ml,
+                    'unit_status': unit.status,
+                    'collection_date': unit.collection_date.isoformat(),
+                    'location': unit.location,
+                }, status=201)
+
+            messages.success(request, success_msg)
+            return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+        else:
+            if is_api:
+                return JsonResponse({
+                    'error': 'Validation failed.',
+                    'errors': form.errors.get_json_data()
+                }, status=400)
+            messages.error(request, "Please correct the errors in the blood collection form.")
+    else:
+        # Pre-select donor if donor_id passed in query string
+        initial_data = {}
+        donor_id = request.GET.get('donor_id')
+        if donor_id:
+            try:
+                donor_obj = User.objects.get(pk=donor_id, role=User.Role.DONOR)
+                initial_data['donor'] = donor_obj
+                if donor_obj.blood_group:
+                    initial_data['blood_group'] = donor_obj.blood_group
+            except (User.DoesNotExist, ValueError):
+                pass
+        form = BloodCollectionForm(initial=initial_data)
+
+    recent_collections = BloodUnit.objects.select_related(
+        'donor', 'collected_by'
+    ).order_by('-collection_date')[:10]
+    donor_count = User.objects.filter(role=User.Role.DONOR).count()
+
+    context = {
+        'title': 'Record Blood Collection',
+        'form': form,
+        'recent_collections': recent_collections,
+        'donor_count': donor_count,
+    }
+    return render(request, 'inventory/record_collection.html', context)
+
