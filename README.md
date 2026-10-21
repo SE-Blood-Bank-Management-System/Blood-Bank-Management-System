@@ -75,7 +75,23 @@ The system implements consistent blood group management across donors, collected
 
 ---
 
-## 4. Modular Architecture & Apps
+## 4. Donation Appointment Booking & Capacity Management (SRS 4.4: BBMS-F-012 to BBMS-F-016)
+
+The system implements slot-based blood donation appointment scheduling, strict capacity enforcement, and lifecycle management (TC-APT-01, TC-APT-02):
+
+### Slot Capacity & Overbooking Prevention (SRS BBMS-F-012, BBMS-F-013)
+- **Time Slots & Capacity**: Configurable daily slots per donation center with maximum donor limits (`AppointmentSlot.max_capacity`, default 5).
+- **Concurrency & Atomic Locking**: Bookings use atomic transactions with database row-level locking (`select_for_update`) to prevent overbooking races. Full slots reject excess bookings and return HTTP 409 Conflict via REST API.
+- **Medical Eligibility Enforcement**: Only authenticated donors who have passed the pre-donation medical eligibility questionnaire (SRS BBMS-F-009) can book visits.
+
+### Rescheduling & Cancellation Rules (SRS BBMS-F-014, BBMS-F-015)
+- **24-Hour Reschedule Boundary**: Donors may reschedule up to 24 hours prior to their scheduled slot (TC-APT-02). Rescheduling inside 24 hours is rejected.
+- **Immediate Capacity Release**: Cancelling an appointment automatically frees reserved slot capacity for other donors (TC-APT-01).
+- **Confirmation Notifications (BBMS-F-016)**: Structured booking confirmations with unique references (`APT-XXXXXXXX`), center addresses, and screening audit records.
+
+---
+
+## 5. Modular Architecture & Apps
 
 | Django App | SRS Section Reference | Key Responsibilities |
 | :--- | :--- | :--- |
@@ -87,7 +103,7 @@ The system implements consistent blood group management across donors, collected
 
 ---
 
-## 5. Prerequisites
+## 6. Prerequisites
 
 - **Python**: Version 3.10 or higher
 - **pip**: Standard Python package manager
@@ -95,7 +111,7 @@ The system implements consistent blood group management across donors, collected
 
 ---
 
-## 6. Quickstart / Run Steps
+## 7. Quickstart / Run Steps
 
 A fresh clone of the repository runs with standard Django commands:
 
@@ -154,14 +170,15 @@ BBMS_SECURE_COOKIES=0 python manage.py runserver
 For HTTPS environments, leave `BBMS_SECURE_COOKIES` unset (or set it to `1`).
 Sessions expire after 30 minutes without a request and renew with activity.
 Logout uses a CSRF-protected POST from the navigation or profile page.
-See [Issue #3 implementation and acceptance checks](docs/login-sessions.md).
+See [Issue #3 implementation and acceptance checks](docs/login-sessions.md) and
+[Issue #9 Appointment Slots and Booking](docs/appointments.md).
 
 Open your browser and navigate to:
 **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)**
 
 ---
 
-## 7. Running Automated Tests & Linting
+## 8. Running Automated Tests & Linting
 
 ### Run automated unit and integration tests:
 ```bash
@@ -184,7 +201,7 @@ python manage.py test inventory
 
 ---
 
-## 8. Technology Stack
+## 9. Technology Stack
 
 - **Backend**: Python 3.10+ / Django 5.2 (SRS 2.4, NF-013)
 - **Database**: SQLite (SRS 2.4, NF-014)
