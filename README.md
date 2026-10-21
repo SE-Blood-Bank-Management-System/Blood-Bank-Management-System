@@ -136,9 +136,25 @@ python manage.py createsuperuser
 *(Superusers automatically inherit the `ADMIN` role and approval flags).*
 
 ### Step 6: Start the development server
-```bash
+
+Session and CSRF cookies default to `Secure` for HTTPS. For the local HTTP demo
+only, explicitly disable that flag in the terminal running the server:
+
+```powershell
+# Windows PowerShell - local HTTP development only
+$env:BBMS_SECURE_COOKIES = "0"
 python manage.py runserver
 ```
+
+```bash
+# Linux/macOS - local HTTP development only
+BBMS_SECURE_COOKIES=0 python manage.py runserver
+```
+
+For HTTPS environments, leave `BBMS_SECURE_COOKIES` unset (or set it to `1`).
+Sessions expire after 30 minutes without a request and renew with activity.
+Logout uses a CSRF-protected POST from the navigation or profile page.
+See [Issue #3 implementation and acceptance checks](docs/login-sessions.md).
 
 Open your browser and navigate to:
 **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)**
