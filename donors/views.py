@@ -19,12 +19,21 @@ def dashboard(request):
     else:
         eligibility_status = 'Pending Screening'
 
+    upcoming_appointments = []
+    if hasattr(request.user, 'appointments'):
+        upcoming_appointments = list(
+            request.user.appointments.filter(
+                status__in=['SCHEDULED', 'CONFIRMED']
+            ).select_related('location', 'slot').order_by('date', 'slot__start_time')[:3]
+        )
+
     context = {
         'title': 'Donor Dashboard',
         'donor': request.user,
         'next_eligible_date': 'Available now (No prior donations recorded)',
         'total_donations': 0,
         'recent_donations': [],
+        'upcoming_appointments': upcoming_appointments,
         'eligibility_status': eligibility_status,
         'latest_eligibility': latest_eligibility,
         'is_eligible': getattr(request.user, 'is_eligible', False),

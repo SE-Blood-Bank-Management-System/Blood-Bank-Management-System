@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Appointments - BBMS{% endblock %}
+{% block title %}My Appointments - BBMS{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -14,13 +14,129 @@
     </a>
   </div>
 
-  <div class="card border-0 shadow-sm">
-    <div class="card-body p-4 text-center text-muted py-5">
-      <i class="bi bi-calendar3 fs-1 text-primary opacity-50 mb-3 d-block"></i>
-      <h5 class="fw-semibold">No appointments scheduled</h5>
-      <p class="small text-muted mb-3">You do not have any pending appointments. Choose an available date, slot, and center to schedule a donation.</p>
-      <a href="{% url 'appointments:book' %}" class="btn btn-danger btn-sm">Book Appointment</a>
+  {% if appointments %}
+    <div class="card border-0 shadow-sm overflow-hidden mb-4">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">Booking Ref</th>
+              {% if user.is_staff_member or user.is_administrator %}
+                <th scope="col">Donor</th>
+              {% endif %}
+              <th scope="col">Donation Center</th>
+              <th scope="col">Date</th>
+              <th scope="col">Time Slot</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for apt in appointments %}
+              <tr>
+                <td>
+                  <a href="{% url 'appointments:detail' apt.pk %}" class="fw-bold text-decoration-none">
+                    <code>{{ apt.booking_reference }}</code>
+                  </a>
+                </td>
+                {% if user.is_staff_member or user.is_administrator %}
+                  <td>
+                    <div class="fw-semibold">{{ apt.donor.get_full_name|default:apt.donor.username }}</div>
+                    <div class="small text-muted">{{ apt.donor.email }}</div>
+                  </td>
+                {% endif %}
+                <td>
+                  <div class="fw-semibold">{{ apt.location.name }}</div>
+                  <div class="small text-muted">{{ apt.location.city }}</div>
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark border">
+                    <i class="bi bi-calendar3 me-1 text-danger"></i>{{ apt.date|date:"M d, Y" }}
+                  </span>
+                </td>
+                <td>
+                  <span class="small fw-semibold text-secondary">
+                    <i class="bi bi-clock me-1"></i>{{ apt.time_slot }}
+                  </span>
+                </td>
+                <td>
+                  {% if apt.status == 'CONFIRMED' %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Confirmed</span>
+                  {% elif apt.status == 'SCHEDULED' %}
+                    <span class="badge bg-primary"><i class="bi bi-calendar-event me-1"></i>Scheduled</span>
+                  {% elif apt.status == 'COMPLETED' %}
+                    <span class="badge bg-info text-dark"><i class="bi bi-check2-all me-1"></i>Completed</span>
+                  {% elif apt.status == 'CANCELLED' %}
+                    <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i>Cancelled</span>
+                  {% elif apt.status == 'RESCHEDULED' %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-arrow-repeat me-1"></i>Rescheduled</span>
+                  {% else %}
+                    <span class="badge bg-light text-dark border">{{ apt.status }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm">
+                    <a href="{% url 'appointments:detail' apt.pk %}" class="btn btn-outline-secondary" title="View Details">
+                      <i class="bi bi-eye"></i> View
+                    </a>
+                    {% if apt.can_reschedule %}
+                      <a href="{% url 'appointments:reschedule' apt.pk %}" class="btn btn-outline-primary" title="Reschedule (Allowed up to 24h before)">
+                        <i class="bi bi-calendar-event"></i> Reschedule
+                      </a>
+                    {% endif %}
+                    {% if apt.can_cancel %}
+                      <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ apt.pk }}" title="Cancel appointment">
+                        <i class="bi bi-trash"></i> Cancel
+                      </button>
+                    {% endif %}
+                  </div>
+
+                  <!-- Cancel Modal for this appointment -->
+                  {% if apt.can_cancel %}
+                    <div class="modal fade text-start" id="cancelModal{{ apt.pk }}" tabindex="-1" aria-labelledby="cancelModalLabel{{ apt.pk }}" aria-hidden="true">
+                      <div class="modal-dialog">
+                        <div class="modal-content">
+                          <form method="post" action="{% url 'appointments:cancel' apt.pk %}">
+                            {% csrf_token %}
+                            <div class="modal-header">
+                              <h5 class="modal-title fw-bold" id="cancelModalLabel{{ apt.pk }}">Cancel Appointment</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                              <p>Are you sure you want to cancel your appointment <strong>{{ apt.booking_reference }}</strong> scheduled for <strong>{{ apt.date }}</strong> at <strong>{{ apt.time_slot }}</strong>?</p>
+                              <div class="alert alert-warning small">
+                                <i class="bi bi-info-circle me-1"></i>Cancelling will release your reserved slot capacity so other eligible donors can book (SRS BBMS-F-015).
+                              </div>
+                              <div class="mb-3">
+                                <label class="form-label small fw-semibold">Cancellation Reason (Optional)</label>
+                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="e.g. Personal emergency, scheduling conflict">
+                              </div>
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Keep Appointment</button>
+                              <button type="submit" class="btn btn-danger btn-sm">Confirm Cancellation</button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  {% else %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4 text-center text-muted py-5">
+        <i class="bi bi-calendar3 fs-1 text-primary opacity-50 mb-3 d-block"></i>
+        <h5 class="fw-semibold">No appointments scheduled</h5>
+        <p class="small text-muted mb-3">You do not have any pending appointments. Choose an available date, slot, and center to schedule a donation.</p>
+        <a href="{% url 'appointments:book' %}" class="btn btn-danger btn-sm">Book Appointment</a>
+      </div>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

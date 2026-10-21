@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}Appointment {{ appointment.booking_reference }} - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left me-1"></i>Back to My Appointments
+        </a>
+        <div class="d-flex gap-2">
+          <button onclick="window.print()" class="btn btn-outline-dark btn-sm">
+            <i class="bi bi-printer me-1"></i>Print Slip
+          </button>
+          {% if can_reschedule %}
+            <a href="{% url 'appointments:reschedule' appointment.pk %}" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-calendar-event me-1"></i>Reschedule
+            </a>
+          {% endif %}
+          {% if can_cancel %}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm overflow-hidden mb-4">
+        <div class="card-header bg-danger text-white py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h4 class="fw-bold mb-0"><i class="bi bi-check2-circle me-2"></i>Donation Appointment Confirmation</h4>
+            <div class="small opacity-75">SRS Section 4.4 (BBMS-F-012, BBMS-F-016)</div>
+          </div>
+          <span class="badge bg-white text-danger fs-6 px-3 py-2">
+            Ref: {{ appointment.booking_reference }}
+          </span>
+        </div>
+
+        <div class="card-body p-4">
+          <!-- Status Alert -->
+          <div class="alert {% if appointment.status == 'CONFIRMED' %}alert-success{% elif appointment.status == 'CANCELLED' %}alert-secondary{% elif appointment.status == 'RESCHEDULED' %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center mb-4">
+            <i class="bi {% if appointment.status == 'CONFIRMED' %}bi-check-circle-fill text-success{% elif appointment.status == 'CANCELLED' %}bi-x-circle-fill text-secondary{% else %}bi-info-circle-fill text-primary{% endif %} fs-3 me-3"></i>
+            <div>
+              <div class="fw-bold fs-6">Appointment Status: {{ appointment.get_status_display }}</div>
+              <div class="small">
+                {% if appointment.status == 'CONFIRMED' %}
+                  Your seat is confirmed and reserved at the blood center. Please arrive 10 minutes before your slot.
+                {% elif appointment.status == 'CANCELLED' %}
+                  This appointment has been cancelled. Reserved slot capacity was released. Reason: {{ appointment.cancellation_reason|default:'None given' }}
+                {% elif appointment.status == 'COMPLETED' %}
+                  Collection completed successfully. Thank you for your donation!
+                {% else %}
+                  Status updated.
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Appointment Details Grid -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <h6 class="fw-bold text-danger text-uppercase small mb-3">
+                  <i class="bi bi-calendar3 me-1"></i>Date & Time Slot
+                </h6>
+                <div class="fs-5 fw-bold text-dark">{{ appointment.date|date:"l, F d, Y" }}</div>
+                <div class="text-secondary fw-semibold mt-1">
+                  <i class="bi bi-clock me-1 text-primary"></i>{{ appointment.time_slot }}
+                </div>
+                <div class="small text-muted mt-2">
+                  Booked on: {{ appointment.created_at|date:"M d, Y H:i" }}
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100 bg-light-subtle">
+                <h6 class="fw-bold text-danger text-uppercase small mb-3">
+                  <i class="bi bi-geo-alt-fill me-1"></i>Donation Center Location
+                </h6>
+                <div class="fs-6 fw-bold text-dark">{{ appointment.location.name }}</div>
+                <div class="text-muted small mt-1">{{ appointment.location.address }}</div>
+                <div class="text-muted small">{{ appointment.location.city }}, {{ appointment.location.state }}</div>
+                {% if appointment.location.contact_number %}
+                  <div class="small text-secondary mt-2">
+                    <i class="bi bi-telephone me-1"></i>{{ appointment.location.contact_number }}
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Donor & Screening Details -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase small mb-3">
+                  <i class="bi bi-person-fill me-1"></i>Donor Information
+                </h6>
+                <div><strong>Name:</strong> {{ appointment.donor.get_full_name|default:appointment.donor.username }}</div>
+                <div><strong>Email:</strong> {{ appointment.donor.email }}</div>
+                <div><strong>Blood Group:</strong> <span class="badge bg-danger">{{ appointment.donor.blood_group|default:"Not specified" }}</span></div>
+                {% if appointment.donor_notes %}
+                  <div class="mt-2 small text-muted"><strong>Notes:</strong> {{ appointment.donor_notes }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="border rounded p-3 h-100">
+                <h6 class="fw-bold text-muted text-uppercase small mb-3">
+                  <i class="bi bi-clipboard2-pulse me-1"></i>Medical Eligibility Audit (SRS BBMS-F-011)
+                </h6>
+                {% if appointment.eligibility_check %}
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Screening Cleared</span>
+                    <span class="small text-muted">{{ appointment.eligibility_check.created_at|date:"M d, Y" }}</span>
+                  </div>
+                  <div class="small text-muted">Responses archived with appointment record for compliance and safety audit.</div>
+                {% else %}
+                  <div class="small text-muted">Cleared via administrative override or legacy record.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Rescheduling & Cancellation rules reminder -->
+          <div class="alert alert-light border small text-muted mb-0">
+            <strong>Policies:</strong>
+            Rescheduling is permitted up to 24 hours before the scheduled time (SRS BBMS-F-014).
+            Cancellation releases capacity immediately (SRS BBMS-F-015).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Modal -->
+{% if can_cancel %}
+  <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form method="post" action="{% url 'appointments:cancel' appointment.pk %}">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h5 class="modal-title fw-bold" id="cancelModalLabel">Cancel Appointment</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to cancel appointment <strong>{{ appointment.booking_reference }}</strong>?</p>
+            <div class="alert alert-warning small">
+              This will release your reserved slot capacity so other donors can book (SRS BBMS-F-015).
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Cancellation Reason (Optional)</label>
+              <input type="text" name="reason" class="form-control form-control-sm" placeholder="e.g. Schedule conflict">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Keep Appointment</button>
+            <button type="submit" class="btn btn-danger btn-sm">Confirm Cancellation</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

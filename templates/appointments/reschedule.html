@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Reschedule Appointment - BBMS{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm p-4">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-calendar-event text-danger me-2"></i>Reschedule Donation Appointment</h3>
+            <p class="text-muted small mb-0">Select a new date, donation center, and available time slot (SRS BBMS-F-014)</p>
+          </div>
+          <a href="{% url 'appointments:detail' appointment.pk %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back
+          </a>
+        </div>
+        <hr>
+
+        <!-- Current Appointment Info -->
+        <div class="card bg-light border-0 p-3 mb-4">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="small text-muted text-uppercase fw-semibold">Current Booking</div>
+              <div class="fw-bold text-dark fs-6">{{ appointment.booking_reference }} - {{ appointment.location.name }}</div>
+              <div class="small text-secondary">{{ appointment.date|date:"l, F d, Y" }} at {{ appointment.time_slot }}</div>
+            </div>
+            <span class="badge bg-primary fs-6">{{ appointment.get_status_display }}</span>
+          </div>
+        </div>
+
+        <div class="alert alert-info small mb-4">
+          <i class="bi bi-info-circle-fill me-1"></i>
+          <strong>Policy:</strong> Rescheduling is allowed up to 24 hours prior to your scheduled appointment time (SRS BBMS-F-014, TC-APT-02).
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-4">
+              {% for error in form.non_field_errors %}
+                <div><i class="bi bi-x-circle me-1"></i>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Donation Center</label>
+            <select name="location" id="rescheduleLocSelect" class="form-select" required>
+              {% for loc in locations %}
+                <option value="{{ loc.id }}" {% if form.location.value|stringformat:"s" == loc.id|stringformat:"s" or appointment.location.id == loc.id %}selected{% endif %}>
+                  {{ loc.name }} ({{ loc.city }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">New Donation Date</label>
+              <input type="date" name="date" id="rescheduleDateInput" class="form-control"
+                     value="{{ form.date.value|date:'Y-m-d'|default:'' }}"
+                     min="{{ min_date }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">New Time Slot</label>
+              <input type="hidden" name="slot_id" id="rescheduleSlotId" value="{{ form.slot_id.value|default:'' }}">
+              <select id="rescheduleSlotSelect" class="form-select" required onchange="document.getElementById('rescheduleSlotId').value = this.value">
+                <option value="">-- Choose a slot --</option>
+              </select>
+              <div class="form-text small">Select date above to inspect live available slots.</div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'appointments:detail' appointment.pk %}" class="btn btn-outline-secondary">
+              Keep Current Appointment
+            </a>
+            <button type="submit" class="btn btn-danger">
+              <i class="bi bi-check2-circle me-1"></i>Confirm Reschedule
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const locSelect = document.getElementById('rescheduleLocSelect');
+  const dateInput = document.getElementById('rescheduleDateInput');
+  const slotSelect = document.getElementById('rescheduleSlotSelect');
+  const slotIdInput = document.getElementById('rescheduleSlotId');
+
+  function updateSlots() {
+    const locId = locSelect.value;
+    const dateVal = dateInput.value;
+    if (!locId || !dateVal) return;
+
+    fetch('{% url "appointments:api_slots" %}?location_id=' + encodeURIComponent(locId) + '&date=' + encodeURIComponent(dateVal))
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data.slots) return;
+        slotSelect.innerHTML = '<option value="">-- Select replacement slot --</option>';
+        data.slots.forEach(function(item) {
+          const opt = document.createElement('option');
+          opt.value = item.slot_id;
+          opt.textContent = item.time_label + (item.is_full ? ' (FULL)' : ' (' + item.available_capacity + ' left)');
+          if (item.is_full) opt.disabled = true;
+          slotSelect.appendChild(opt);
+        });
+        if (slotSelect.options.length > 1) {
+          slotSelect.selectedIndex = 1;
+          slotIdInput.value = slotSelect.value;
+        }
+      });
+  }
+
+  locSelect.addEventListener('change', updateSlots);
+  dateInput.addEventListener('change', updateSlots);
+  if (dateInput.value) {
+    updateSlots();
+  }
+});
+</script>
+{% endblock %}

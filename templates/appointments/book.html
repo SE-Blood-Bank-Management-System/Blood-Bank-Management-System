@@ -5,10 +5,17 @@
 {% block content %}
 <div class="container">
   <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
       <div class="card border-0 shadow-sm p-4">
-        <h3 class="fw-bold mb-2"><i class="bi bi-calendar-plus text-danger me-2"></i>Book Blood Donation Appointment</h3>
-        <p class="text-muted small">Select an available blood center location, date, and time slot (SRS BBMS-F-012, BBMS-F-013)</p>
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-calendar-plus text-danger me-2"></i>Book Blood Donation Appointment</h3>
+            <p class="text-muted small mb-0">Select an available blood center location, date, and time slot (SRS BBMS-F-012, BBMS-F-013)</p>
+          </div>
+          <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>My Appointments
+          </a>
+        </div>
         <hr>
 
         {% if not is_eligible %}
@@ -24,45 +31,193 @@
           </div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" id="bookingForm">
           {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-4">
+              {% for error in form.non_field_errors %}
+                <div><i class="bi bi-x-circle me-1"></i>{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
           <div class="mb-3">
-            <label class="form-label fw-semibold">Select Blood Bank Location</label>
-            <select name="location" class="form-select" required>
+            <label class="form-label fw-semibold">Select Blood Bank Location <span class="text-danger">*</span></label>
+            <select name="location" id="locationSelect" class="form-select" required>
               <option value="">-- Choose a location --</option>
               {% for loc in locations %}
-                <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.address }})</option>
+                <option value="{{ loc.id }}" {% if form.location.value|stringformat:"s" == loc.id|stringformat:"s" %}selected{% endif %}>
+                  {{ loc.name }} ({{ loc.city }} - {{ loc.address }})
+                </option>
               {% endfor %}
             </select>
+            {% if form.location.errors %}
+              <div class="text-danger small mt-1">{{ form.location.errors.0 }}</div>
+            {% endif %}
           </div>
 
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Donation Date</label>
-              <input type="date" name="date" class="form-control" required>
+              <label class="form-label fw-semibold">Donation Date <span class="text-danger">*</span></label>
+              <input type="date" name="date" id="dateInput" class="form-control"
+                     value="{{ form.date.value|default:'' }}"
+                     min="{{ min_date }}" max="{{ max_date }}" required>
+              <div class="form-text small">Select any date within the next 60 days.</div>
+              {% if form.date.errors %}
+                <div class="text-danger small mt-1">{{ form.date.errors.0 }}</div>
+              {% endif %}
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold">Time Slot</label>
-              <select name="slot" class="form-select" required>
+              <label class="form-label fw-semibold">Time Slot <span class="text-danger">*</span></label>
+              <input type="hidden" name="slot_id" id="selectedSlotId" value="{{ form.slot_id.value|default:'' }}">
+              <select name="slot" id="slotSelect" class="form-select" required>
                 <option value="">-- Select time slot --</option>
-                {% for slot in slots %}
-                  <option value="{{ slot }}">{{ slot }}</option>
+                {% for s in slots %}
+                  <option value="{{ s }}" {% if form.slot.value == s %}selected{% endif %}>{{ s }}</option>
                 {% endfor %}
               </select>
+              <div class="form-text small" id="slotCapacityHelp">Live capacity limits enforced automatically (SRS BBMS-F-013).</div>
+              {% if form.slot.errors %}
+                <div class="text-danger small mt-1">{{ form.slot.errors.0 }}</div>
+              {% endif %}
             </div>
+          </div>
+
+          <!-- Interactive Slot Capacity Cards -->
+          <div class="mb-4" id="slotsContainerSection">
+            <label class="form-label fw-semibold d-block">Available Time Slots & Capacity</label>
+            <div class="row g-2" id="slotsBadgeGrid">
+              {% for item in slots_data %}
+                <div class="col-sm-6 col-md-4">
+                  <div class="card h-100 p-2 border slot-card {% if item.is_full %}bg-light opacity-50 border-secondary{% else %}border-primary-subtle hover-shadow{% endif %}"
+                       style="cursor: {% if item.is_full %}not-allowed{% else %}pointer{% endif %};"
+                       data-slot-id="{{ item.slot_id }}"
+                       data-slot-label="{{ item.time_label }}"
+                       onclick="selectSlotCard(this, {{ item.slot_id }}, '{{ item.time_label }}', {{ item.is_full|yesno:'true,false' }})">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div class="fw-semibold small"><i class="bi bi-clock me-1 text-primary"></i>{{ item.time_label }}</div>
+                      {% if item.is_full %}
+                        <span class="badge bg-danger">Full (0 left)</span>
+                      {% else %}
+                        <span class="badge bg-success">{{ item.available_capacity }} seats left</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% empty %}
+                <div class="col-12 text-muted small">Select a location and date above to load live slot capacities.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Special Instructions or Notes (Optional)</label>
+            <textarea name="donor_notes" class="form-control" rows="2" placeholder="Note any assistance needed or questions for the blood bank staff...">{{ form.donor_notes.value|default:'' }}</textarea>
           </div>
 
           <div class="alert alert-light border small text-muted mb-4">
-            <i class="bi bi-info-circle me-1"></i>Slot capacity limits are enforced automatically per SRS BBMS-F-013. You can reschedule or cancel up to 24 hours prior.
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <i class="bi bi-shield-check text-success fs-5"></i>
+              <strong>Booking Policy & Commitments:</strong>
+            </div>
+            <ul class="mb-0 ps-3">
+              <li>Each time slot has a strict capacity limit to prevent overbooking (SRS BBMS-F-013).</li>
+              <li>You may reschedule your appointment to another slot up to 24 hours prior (SRS BBMS-F-014).</li>
+              <li>Cancellations automatically release capacity for other life-saving donors (SRS BBMS-F-015).</li>
+            </ul>
           </div>
 
           <div class="d-flex justify-content-between">
-            <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary">Cancel</a>
-            <button type="submit" class="btn btn-danger">Confirm Appointment Booking</button>
+            <a href="{% url 'appointments:list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-danger" {% if not is_eligible %}disabled{% endif %}>
+              <i class="bi bi-check2-circle me-1"></i>Confirm Appointment Booking
+            </button>
           </div>
         </form>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+function selectSlotCard(cardElem, slotId, slotLabel, isFull) {
+  if (isFull) return;
+  document.querySelectorAll('.slot-card').forEach(function(el) {
+    el.classList.remove('border-danger', 'bg-danger-subtle');
+  });
+  cardElem.classList.add('border-danger', 'bg-danger-subtle');
+  document.getElementById('selectedSlotId').value = slotId;
+  const selectElem = document.getElementById('slotSelect');
+  let optionFound = false;
+  for (let i = 0; i < selectElem.options.length; i++) {
+    if (selectElem.options[i].value === slotLabel) {
+      selectElem.selectedIndex = i;
+      optionFound = true;
+      break;
+    }
+  }
+  if (!optionFound) {
+    const opt = new Option(slotLabel, slotLabel, true, true);
+    selectElem.add(opt);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const locSelect = document.getElementById('locationSelect');
+  const dateInput = document.getElementById('dateInput');
+  const slotSelect = document.getElementById('slotSelect');
+  const gridContainer = document.getElementById('slotsBadgeGrid');
+
+  function refreshSlots() {
+    const locId = locSelect.value;
+    const dateVal = dateInput.value;
+    if (!locId || !dateVal) return;
+
+    fetch('{% url "appointments:api_slots" %}?location_id=' + encodeURIComponent(locId) + '&date=' + encodeURIComponent(dateVal))
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (!data.slots) return;
+        gridContainer.innerHTML = '';
+        slotSelect.innerHTML = '<option value="">-- Select time slot --</option>';
+
+        data.slots.forEach(function(item) {
+          // Update select
+          const opt = document.createElement('option');
+          opt.value = item.time_label;
+          opt.textContent = item.time_label + (item.is_full ? ' (FULL)' : ' (' + item.available_capacity + ' available)');
+          if (item.is_full) opt.disabled = true;
+          slotSelect.appendChild(opt);
+
+          // Update cards
+          const col = document.createElement('div');
+          col.className = 'col-sm-6 col-md-4';
+          const card = document.createElement('div');
+          card.className = 'card h-100 p-2 border slot-card ' + (item.is_full ? 'bg-light opacity-50 border-secondary' : 'border-primary-subtle hover-shadow');
+          card.style.cursor = item.is_full ? 'not-allowed' : 'pointer';
+          card.onclick = function() { selectSlotCard(card, item.slot_id, item.time_label, item.is_full); };
+
+          const badge = item.is_full
+            ? '<span class="badge bg-danger">Full (0 left)</span>'
+            : '<span class="badge bg-success">' + item.available_capacity + ' seats left</span>';
+
+          card.innerHTML = '<div class="d-flex justify-content-between align-items-center">' +
+                           '<div class="fw-semibold small"><i class="bi bi-clock me-1 text-primary"></i>' + item.time_label + '</div>' +
+                           badge +
+                           '</div>';
+          col.appendChild(card);
+          gridContainer.appendChild(col);
+        });
+      })
+      .catch(function(err) {
+        console.warn('Could not fetch dynamic slots:', err);
+      });
+  }
+
+  locSelect.addEventListener('change', refreshSlots);
+  dateInput.addEventListener('change', refreshSlots);
+});
+</script>
 {% endblock %}
