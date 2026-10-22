@@ -10,6 +10,13 @@ from django.utils import timezone
 from .models import User
 
 
+def clean_contact_number(phone):
+    digits = re.sub(r'\D', '', phone)
+    if not re.fullmatch(r'\+?[0-9 ()-]+', phone) or not 7 <= len(digits) <= 15:
+        raise forms.ValidationError('Enter a valid contact number containing 7 to 15 digits.')
+    return phone
+
+
 class LoginForm(AuthenticationForm):
     username = forms.CharField(label='Email or username', max_length=254)
 
@@ -102,11 +109,7 @@ class DonorRegistrationForm(forms.ModelForm):
         return clean_email
 
     def clean_phone(self):
-        phone = self.cleaned_data['phone']
-        digits = re.sub(r'\D', '', phone)
-        if not re.fullmatch(r'\+?[0-9 ()-]+', phone) or not 7 <= len(digits) <= 15:
-            raise forms.ValidationError('Enter a valid contact number containing 7 to 15 digits.')
-        return phone
+        return clean_contact_number(self.cleaned_data['phone'])
 
     def _post_clean(self):
         super()._post_clean()
@@ -216,7 +219,7 @@ class UserProfileUpdateForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
     )
     blood_group = forms.ChoiceField(
-        choices=[('', 'Unknown / Not sure')] + list(User.BloodGroup.choices),
+        choices=[('', 'Unknown / Not sure')] + [(value, value) for value in User.BloodGroup.values],
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -224,3 +227,7 @@ class UserProfileUpdateForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ('phone', 'address', 'blood_group')
+
+    def clean_phone(self):
+        phone = self.cleaned_data['phone']
+        return clean_contact_number(phone) if phone else phone

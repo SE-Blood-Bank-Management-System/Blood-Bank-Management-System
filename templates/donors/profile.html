@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Donor Profile - BBMS{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0">Donor Profile</h2>
+    {% if user.pk == donor.pk %}
+      <a class="btn btn-outline-danger" href="{% url 'accounts:profile' %}">Edit My Profile</a>
+    {% endif %}
+  </div>
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100"><div class="card-body p-4">
+        <h5 class="fw-bold">{{ donor.get_full_name|default:donor.username }}</h5>
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Email</dt><dd class="col-sm-7">{{ donor.email|default:"Not specified" }}</dd>
+          <dt class="col-sm-5">Date of Birth</dt><dd class="col-sm-7">{{ donor.date_of_birth|default:"Not specified" }}</dd>
+          <dt class="col-sm-5">Gender</dt><dd class="col-sm-7">{{ donor.get_gender_display|default:"Not specified" }}</dd>
+          <dt class="col-sm-5">Contact Number</dt><dd class="col-sm-7">{{ donor.phone|default:"Not specified" }}</dd>
+          <dt class="col-sm-5">Address</dt><dd class="col-sm-7">{{ donor.address|default:"Not specified" }}</dd>
+          <dt class="col-sm-5">Self-Reported Blood Group</dt><dd class="col-sm-7">{{ donor.blood_group|default:"Unknown" }}</dd>
+        </dl>
+      </div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100"><div class="card-body p-4">
+        <p class="fw-semibold">Total Donations: {{ total_donations }}</p>
+        {% include 'donors/_interval.html' %}
+      </div></div>
+    </div>
+  </div>
+  <div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Recent Donations</h5>
+      <a href="{% url 'donors:donor_history' donor.pk %}">View All History</a>
+    </div>
+    <div class="card-body">{% include 'donors/_donation_table.html' with donations=recent_donations %}</div>
+  </div>
+</div>
+{% endblock %}

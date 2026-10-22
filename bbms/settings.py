@@ -158,3 +158,6 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = os.environ.get('BBMS_SECURE_COOKIES', '1') != '0'
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
+# BBMS-F-008: minimum calendar days after a completed donation.
+DONATION_MIN_INTERVAL_DAYS = 90
+

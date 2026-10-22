@@ -10,6 +10,7 @@
       <p class="text-muted mb-0">Welcome, {{ user.get_full_name|default:user.username }}</p>
     </div>
     <div class="d-flex gap-2">
+      <a href="{% url 'accounts:profile' %}" class="btn btn-outline-danger">My Profile</a>
       <a href="{% url 'appointments:book' %}" class="btn btn-danger">
         <i class="bi bi-calendar-plus me-1"></i>Book Donation Appointment
       </a>
@@ -33,8 +34,9 @@
         <div class="d-flex align-items-center gap-3">
           <div class="card-icon mb-0 bg-success-subtle text-success"><i class="bi bi-calendar-check"></i></div>
           <div>
-            <div class="text-muted small">Next Eligible Donation (SRS BBMS-F-008)</div>
-            <div class="fw-semibold text-success">{{ next_eligible_date }}</div>
+            <div class="text-muted small">Next Eligible Donation</div>
+            <div class="fw-semibold text-success">{% if next_eligible_date %}{{ next_eligible_date|date:"d M Y" }}{% else %}No previous donations{% endif %}</div>
+            <div class="small text-muted">{{ minimum_interval_days }}-day interval; medical screening also required.</div>
           </div>
         </div>
       </div>
@@ -45,19 +47,19 @@
           {% if is_eligible %}
             <div class="card-icon mb-0 bg-success-subtle text-success"><i class="bi bi-shield-check"></i></div>
             <div>
-              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="text-muted small">Medical Screening Status</div>
               <div class="fw-semibold text-success"><i class="bi bi-check-circle-fill me-1"></i>Eligible</div>
             </div>
           {% elif latest_eligibility %}
             <div class="card-icon mb-0 bg-danger-subtle text-danger"><i class="bi bi-shield-x"></i></div>
             <div>
-              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="text-muted small">Medical Screening Status</div>
               <div class="fw-semibold text-danger"><i class="bi bi-x-circle-fill me-1"></i>Temporarily Ineligible</div>
             </div>
           {% else %}
             <div class="card-icon mb-0 bg-primary-subtle text-primary"><i class="bi bi-shield"></i></div>
             <div>
-              <div class="text-muted small">Eligibility Status (SRS BBMS-F-010)</div>
+              <div class="text-muted small">Medical Screening Status</div>
               <div class="fw-semibold text-primary">Pending Screening</div>
             </div>
           {% endif %}
@@ -97,6 +99,14 @@
       </div>
     </div>
   {% endif %}
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h5 class="fw-bold mb-0">Recent Donations</h5>
+      <a href="{% url 'donors:history' %}">View All</a>
+    </div>
+    <div class="card-body">{% include 'donors/_donation_table.html' with donations=recent_donations %}</div>
+  </div>
 
   <!-- Quick Links Card -->
   <div class="card border-0 shadow-sm mb-4">

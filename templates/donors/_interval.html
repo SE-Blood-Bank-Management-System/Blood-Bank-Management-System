@@ -1,0 +1,8 @@
+<h6 class="fw-bold">Next Eligible Donation Date</h6>
+{% if next_eligible_date %}
+  <p class="mb-1 fw-semibold">{{ next_eligible_date|date:"d M Y" }}</p>
+  {% if can_donate_by_interval %}<p class="mb-1 text-success">Donation interval completed.</p>{% endif %}
+{% else %}
+  <p class="mb-1">No previous donations recorded.</p>
+{% endif %}
+<p class="text-muted small mb-0">The donation interval is {{ minimum_interval_days }} days. Medical screening is also required before donation.</p>
