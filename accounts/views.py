@@ -6,6 +6,7 @@ from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
+from donors.services import donation_summary
 from .forms import DonorRegistrationForm, HospitalRegistrationForm, LoginForm, UserProfileUpdateForm
 from .models import User
 
@@ -138,6 +139,8 @@ def register_hospital(request):
 
 
 @login_required
+@never_cache
+@require_http_methods(['GET', 'POST'])
 def profile(request):
     """
     View and update user profile details (contact number, address, blood group).
@@ -149,14 +152,11 @@ def profile(request):
             form.save()
             messages.success(request, 'Profile details updated successfully (SRS BBMS-F-006).')
             return redirect('accounts:profile')
-        else:
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, error)
     else:
         form = UserProfileUpdateForm(instance=request.user)
 
     return render(request, 'accounts/profile.html', {
+        **(donation_summary(request.user) if request.user.is_donor else {}),
         'title': 'User Profile',
         'user': request.user,
         'form': form
