@@ -38,6 +38,7 @@ class DonorProfileViewTests(TestCase):
 
     def test_own_profile_displays_registered_fields_and_next_date(self):
         response = self.client.get(reverse('accounts:profile'))
+        self.assertContains(response, '<option value="B+">B+</option>', html=True)
         for text in ['Jane Donor', 'owner@example.com', '9876543210', 'Female', 'A+']:
             self.assertContains(response, text)
         expected = timezone.localtime(self.recent.collection_date).date() + timedelta(days=90)

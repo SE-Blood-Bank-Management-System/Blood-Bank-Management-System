@@ -81,6 +81,12 @@ zone, component/future exclusions, disposal, profile display and updates,
 lab/self-reported group isolation, privacy, authorized staff review, empty
 states, pagination, JSON errors, CSRF, escaped markup and screening separation.
 
+Recorded results: the 12-test focused baseline passed; the full 175-test suite
+passed with normal password settings. After correcting the profile's inherited
+B+ display label, 35 focused donor/blood-group checks passed. Flake8, Django
+checks, migration-drift and whitespace checks passed. Dashboard, profile and
+history pages were also inspected using a synthetic-data browser preview.
+
 ```bash
 python manage.py test donors.test_history_rules donors.test_profile_views donors.test_profile_api --parallel 4
 python manage.py test --parallel 4
