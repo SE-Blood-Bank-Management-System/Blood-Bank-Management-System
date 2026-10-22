@@ -1,13 +1,20 @@
 import json
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_safe
 from accounts.models import User
 from accounts.rbac import role_required, _is_api_request
 from .forms import MedicalEligibilityForm
 from .models import MedicalEligibilityResponse, QUESTIONNAIRE_QUESTIONS
+from .services import donation_summary
 
 
 @role_required(User.Role.DONOR, User.Role.ADMIN)
+@never_cache
+@require_safe
 def dashboard(request):
     """
     Donor Dashboard (SRS 4.2: BBMS-F-006 to BBMS-F-008).
@@ -27,12 +34,12 @@ def dashboard(request):
             ).select_related('location', 'slot').order_by('date', 'slot__start_time')[:3]
         )
 
+    summary = donation_summary(request.user)
     context = {
+        **summary,
         'title': 'Donor Dashboard',
         'donor': request.user,
-        'next_eligible_date': 'Available now (No prior donations recorded)',
-        'total_donations': 0,
-        'recent_donations': [],
+        'recent_donations': summary['donations'][:5],
         'upcoming_appointments': upcoming_appointments,
         'eligibility_status': eligibility_status,
         'latest_eligibility': latest_eligibility,
@@ -41,14 +48,43 @@ def dashboard(request):
     return render(request, 'donors/dashboard.html', context)
 
 
-@role_required(User.Role.DONOR, User.Role.ADMIN)
-def donation_history(request):
+def _donor_for_request(request, donor_id=None):
+    if donor_id is None:
+        if request.user.role == User.Role.STAFF:
+            raise PermissionDenied('Select a donor to review their history.')
+        return request.user
+    if request.user.is_donor and donor_id != request.user.pk:
+        raise PermissionDenied('You can only view your own donor information.')
+    return get_object_or_404(User, pk=donor_id, role=User.Role.DONOR)
+
+
+@role_required(User.Role.DONOR, User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_safe
+def donor_profile(request, donor_id):
+    donor = _donor_for_request(request, donor_id)
+    summary = donation_summary(donor)
+    return render(request, 'donors/profile.html', {
+        **summary, 'donor': donor, 'recent_donations': summary['donations'][:5],
+    })
+
+
+@role_required(User.Role.DONOR, User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_safe
+def donation_history(request, donor_id=None):
     """
     View donation history including Bag IDs, dates, and locations (SRS 4.2: BBMS-F-007).
     """
+    donor = _donor_for_request(request, donor_id)
+    summary = donation_summary(donor)
+    page = Paginator(summary['donations'], 25).get_page(request.GET.get('page'))
     context = {
+        **summary,
+        'donor': donor,
         'title': 'Donation History',
-        'donations': [],
+        'donations': page,
+        'page_obj': page,
     }
     return render(request, 'donors/history.html', context)
 
