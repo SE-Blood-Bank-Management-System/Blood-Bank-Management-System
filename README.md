@@ -207,3 +207,16 @@ python manage.py test inventory
 - **Database**: SQLite (SRS 2.4, NF-014)
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+), Bootstrap 5.3, Bootstrap Icons (SRS 3.1, NF-008)
 - **Architecture**: Modular Monolith / Layered (SRS NF-010, SAD 3.5)
+
+## 9. Donor Profile and History (Issue #7)
+
+Donors can edit contact details and self-reported blood group on their profile,
+view recorded donations, and see their next eligible donation date. Staff can
+review donor profiles through links on blood-unit detail pages.
+
+`DONATION_MIN_INTERVAL_DAYS` defaults to 90 in `bbms/settings.py`. Collection
+history excludes derived components and future records. Medical screening is
+shown separately from the donation interval.
+
+The donor API supports `/api/donors/me`, `/api/donors/me/donations` and
+`/api/donors/me/eligibility`. See [rules, access controls and API usage](docs/donor-profile-history.md).
