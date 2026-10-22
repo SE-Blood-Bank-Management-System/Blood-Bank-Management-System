@@ -20,6 +20,7 @@ urlpatterns = [
     path('', include('core.urls', namespace='core')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('donors/', include('donors.urls', namespace='donors')),
+    path('api/donors/', include('donors.api_urls', namespace='donor_api')),
     path('appointments/', include('appointments.urls', namespace='appointments')),
     path('inventory/', include('inventory.urls', namespace='inventory')),
     # REST API endpoints (SAD Section 4.3)
