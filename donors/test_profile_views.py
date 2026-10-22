@@ -126,3 +126,10 @@ class DonorProfileViewTests(TestCase):
         response = self.client.get(reverse('donors:history'), {'page': 2})
         self.assertEqual(len(response.context['donations']), 3)
         self.assertContains(response, 'Page 2 of 2')
+
+    def test_profile_renders_stored_markup_as_text(self):
+        self.donor.address = '<script>alert(1)</script>'
+        self.donor.save()
+        response = self.client.get(reverse('accounts:profile'))
+        self.assertContains(response, '&lt;script&gt;alert(1)&lt;/script&gt;')
+        self.assertNotContains(response, '<script>alert(1)</script>')

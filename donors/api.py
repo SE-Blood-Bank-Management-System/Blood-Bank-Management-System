@@ -4,6 +4,7 @@ import json
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods, require_safe
 
 from accounts.forms import UserProfileUpdateForm
@@ -23,6 +24,7 @@ def profile_data(user):
 
 @role_required(User.Role.DONOR)
 @never_cache
+@ensure_csrf_cookie
 @require_http_methods(['GET', 'PUT'])
 def profile(request):
     if request.method == 'PUT':
