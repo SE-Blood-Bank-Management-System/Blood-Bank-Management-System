@@ -77,7 +77,7 @@
               <tbody>
                 <tr>
                   <th scope="row" class="text-muted w-40">Full Name:</th>
-                  <td class="fw-semibold">{{ unit.donor.get_full_name|default:unit.donor.username }}</td>
+                  <td class="fw-semibold"><a href="{% url 'donors:profile' unit.donor_id %}">{{ unit.donor.get_full_name|default:unit.donor.username }}</a></td>
                 </tr>
                 <tr>
                   <th scope="row" class="text-muted">Username:</th>
