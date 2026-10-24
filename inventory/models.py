@@ -13,7 +13,7 @@ import uuid
 from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import models
+from django.db import models, router, transaction
 from django.utils import timezone
 
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS, validate_blood_group
@@ -105,6 +105,21 @@ class BloodUnitQuerySet(models.QuerySet):
     def discarded(self):
         """Returns units that have been marked Discarded (BBMS-F-027)."""
         return self.filter(status=BloodUnitStatus.DISCARDED)
+
+    def update(self, **kwargs):
+        if 'status' in kwargs:
+            raise ValidationError('Use BloodUnit.save(actor=...) to preserve status history.')
+        return super().update(**kwargs)
+
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
+                    update_fields=None, unique_fields=None):
+        if ignore_conflicts or update_conflicts:
+            raise ValidationError('Conflicting bulk imports cannot bypass status history.')
+        objs = list(objs)
+        with transaction.atomic(using=self.db):
+            for obj in objs:
+                obj.save(force_insert=True, using=self.db, status_reason='Bulk collection import.')
+        return objs
 
 
 class BloodUnit(models.Model):
@@ -209,6 +224,7 @@ class BloodUnit(models.Model):
         blank=True,
         help_text='Audit log of status transitions and serology outcomes (SRS BBMS-F-029)'
     )
+    quarantined_at = models.DateTimeField(null=True, blank=True, db_index=True, editable=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -398,8 +414,8 @@ class BloodUnit(models.Model):
         """
         if not self.is_quarantined:
             return None
-        elapsed = timezone.now() - self.collection_date
-        return round(elapsed.total_seconds() / 86400, 1)
+        elapsed = timezone.now() - (self.quarantined_at or self.collection_date)
+        return max(0, round(elapsed.total_seconds() / 86400, 1))
 
     def clean(self):
         super().clean()
@@ -657,6 +673,50 @@ class BloodUnit(models.Model):
     def __str__(self):
         bg = self.blood_group or "Pending"
         return f"{self.bag_id} ({bg}) - {self.component_type} [{self.status}]"
+
+
+class StatusChangeQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        # Account deletion may unlink the FK; the recorded username stays intact.
+        if kwargs == {'changed_by': None}:
+            return super().update(**kwargs)
+        raise ValidationError('Status history is read-only.')
+
+    def delete(self):
+        raise ValidationError('Status history cannot be deleted.')
+
+
+class StatusChange(models.Model):
+    """Append-only status history with a staff-name snapshot (Issue #14)."""
+    blood_unit = models.ForeignKey(BloodUnit, on_delete=models.PROTECT, related_name='status_changes')
+    previous_status = models.CharField(max_length=20, choices=BloodUnitStatus.choices, blank=True)
+    new_status = models.CharField(max_length=20, choices=BloodUnitStatus.choices)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    actor_label = models.CharField(max_length=150)
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    reason = models.TextField(blank=True)
+
+    objects = StatusChangeQuerySet.as_manager()
+
+    class Meta:
+        ordering = ['-changed_at', '-pk']
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(previous_status=models.F('new_status')),
+                name='status_change_requires_different_states',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Status history is read-only.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Status history cannot be deleted.')
+
+    def __str__(self):
+        return f'{self.blood_unit.bag_id}: {self.previous_status or "Initial"} -> {self.new_status}'
 
 
 class SerologyTest(models.Model):
