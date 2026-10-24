@@ -111,6 +111,11 @@ class BloodUnitQuerySet(models.QuerySet):
             raise ValidationError('Use BloodUnit.save(actor=...) to preserve status history.')
         return super().update(**kwargs)
 
+    def bulk_update(self, objs, fields, batch_size=None):
+        if 'status' in fields:
+            raise ValidationError('Use BloodUnit.save(actor=...) to preserve status history.')
+        return super().bulk_update(objs, fields, batch_size=batch_size)
+
     def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
                     update_fields=None, unique_fields=None):
         if ignore_conflicts or update_conflicts:
@@ -736,6 +741,9 @@ class StatusChangeQuerySet(models.QuerySet):
 
     def delete(self):
         raise ValidationError('Status history cannot be deleted.')
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError('Status history is read-only.')
 
     def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
                     update_fields=None, unique_fields=None):
