@@ -29,35 +29,13 @@ def public_availability(request):
     Accessible without authentication; excludes donor/hospital PII.
     Calculates live counts from available blood units across the eight ABO/Rh blood groups.
     """
-    available_units = BloodUnit.objects.filter(status=BloodUnitStatus.AVAILABLE)
+    available_units = BloodUnit.objects.available()
 
-    if available_units.exists():
-        inventory_summary = []
-        for bg in VALID_BLOOD_GROUPS:
-            count = available_units.filter(blood_group=bg).count()
-            if count >= 10:
-                status_label = 'Adequate'
-            elif count > 0:
-                status_label = 'Low'
-            else:
-                status_label = 'Critical'
-            inventory_summary.append({
-                'blood_group': bg,
-                'units': count,
-                'status': status_label,
-            })
-    else:
-        # Initial baseline sample data before live units are entered
-        inventory_summary = [
-            {'blood_group': 'A+', 'units': 14, 'status': 'Adequate'},
-            {'blood_group': 'A-', 'units': 5, 'status': 'Low'},
-            {'blood_group': 'B+', 'units': 20, 'status': 'Adequate'},
-            {'blood_group': 'B-', 'units': 3, 'status': 'Critical'},
-            {'blood_group': 'AB+', 'units': 9, 'status': 'Adequate'},
-            {'blood_group': 'AB-', 'units': 2, 'status': 'Critical'},
-            {'blood_group': 'O+', 'units': 28, 'status': 'Adequate'},
-            {'blood_group': 'O-', 'units': 4, 'status': 'Low'},
-        ]
+    inventory_summary = []
+    for bg in VALID_BLOOD_GROUPS:
+        count = available_units.filter(blood_group=bg).count()
+        status_label = 'Adequate' if count >= 10 else 'Low' if count > 0 else 'Critical'
+        inventory_summary.append({'blood_group': bg, 'units': count, 'status': status_label})
 
     context = {
         'title': 'Public Blood Availability',
