@@ -145,13 +145,33 @@ The project is pre-configured with SQLite (`db.sqlite3`):
 python manage.py migrate
 ```
 
-### Step 5: (Optional) Create an Administrator Account
+### Step 5: Seed Demonstration Data
+Populate the database with realistic demo accounts across all user roles, donation centers, appointment slots, medical eligibility records, and inventory units:
+```bash
+python manage.py seed_data
+```
+*(Or use the alias `python manage.py seed_demo_data`). This command is idempotent and can be safely re-run at any time.*
+
+#### Pre-Configured Demo Accounts:
+| Role | Username / Email | Password | Primary Showcase Workflow |
+| :--- | :--- | :--- | :--- |
+| **Administrator** | `admin` / `admin@bbms.local` | `AdminPassword@123` | System admin, user accounts, and RBAC control |
+| **Blood Bank Staff** | `staff_john` / `staff.john@bbms.local` | `StaffPassword@123` | Collection recording, automatic unique Bag ID generation |
+| **Lab Technician (Staff)** | `staff_mary` / `staff.mary@bbms.local` | `StaffPassword@123` | Serology test recording (HIV, Hep B/C, Syphilis), quarantine release |
+| **Donor (Eligible)** | `donor_jane` / `donor.jane@bbms.local` | `DonorPassword@123` | Passed screening, active upcoming appointment booking |
+| **Donor (History & Cooldown)** | `donor_rahul` / `donor.rahul@bbms.local` | `DonorPassword@123` | Multiple past donations, 90-day cooldown elapsed (eligible) |
+| **Donor (Recent Cooldown)** | `donor_priya` / `donor.priya@bbms.local` | `DonorPassword@123` | Donated 30 days ago; 90-day cooldown displays 60 days remaining |
+| **Donor (Ineligible)** | `donor_vikram` / `donor.vikram@bbms.local` | `DonorPassword@123` | Temporary ineligibility due to recent fever/antibiotics |
+| **Hospital User (Approved)** | `hospital_city` / `hospital.city@bbms.local` | `HospitalPassword@123` | Approved hospital account (`City General Hospital`) |
+| **Hospital User (Pending)** | `hospital_metro` / `hospital.metro@bbms.local` | `HospitalPassword@123` | Pending admin approval (`Metro Specialty Clinic`) |
+
+### Step 6: (Optional) Create a Custom Administrator Account
 ```bash
 python manage.py createsuperuser
 ```
 *(Superusers automatically inherit the `ADMIN` role and approval flags).*
 
-### Step 6: Start the development server
+### Step 7: Start the development server
 
 Session and CSRF cookies default to `Secure` for HTTPS. For the local HTTP demo
 only, explicitly disable that flag in the terminal running the server:
@@ -190,13 +210,15 @@ python manage.py test --verbosity 2
 flake8 .
 ```
 
-To run tests for a specific module:
+To run tests for a specific module or integration suite:
 ```bash
 python manage.py test accounts
 python manage.py test core
 python manage.py test donors
 python manage.py test appointments
 python manage.py test inventory
+python manage.py test core.test_integration_donor_workflow  # End-to-end donor workflow
+python manage.py test core.test_seed_data                  # Demo seed data verification
 ```
 
 ---
@@ -208,7 +230,9 @@ python manage.py test inventory
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+), Bootstrap 5.3, Bootstrap Icons (SRS 3.1, NF-008)
 - **Architecture**: Modular Monolith / Layered (SRS NF-010, SAD 3.5)
 
-## 9. Donor Profile and History (Issue #7)
+---
+
+## 10. Donor Profile and History (Issue #7)
 
 Donors can edit contact details and self-reported blood group on their profile,
 view recorded donations, and see their next eligible donation date. Staff can
@@ -221,6 +245,12 @@ shown separately from the donation interval.
 The donor API supports `/api/donors/me`, `/api/donors/me/donations` and
 `/api/donors/me/eligibility`. See [rules, access controls and API usage](docs/donor-profile-history.md).
 
+---
+
+## 11. Sprint Demonstration Evidence & Deviations (Issue #5)
+
+- **Demonstration Video & Guide**: See [demo/README.md](demo/README.md) for demonstration instructions, seed account workflows, and the 60-second video storyboard.
+- **System Deviations & Defect Backlog**: See [docs/deviations.md](docs/deviations.md) for detailed documentation of architectural refinements, SRS requirement traceability across sprints, and formally assigned defects for Sprint 2.
 ## 10. Quarantine and Status History (Issue #14)
 
 Staff can inspect the quarantine queue and follow **Status History** from a blood
