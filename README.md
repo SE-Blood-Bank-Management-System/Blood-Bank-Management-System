@@ -251,3 +251,13 @@ The donor API supports `/api/donors/me`, `/api/donors/me/donations` and
 
 - **Demonstration Video & Guide**: See [demo/README.md](demo/README.md) for demonstration instructions, seed account workflows, and the 60-second video storyboard.
 - **System Deviations & Defect Backlog**: See [docs/deviations.md](docs/deviations.md) for detailed documentation of architectural refinements, SRS requirement traceability across sprints, and formally assigned defects for Sprint 2.
+## 10. Quarantine and Status History (Issue #14)
+
+Staff can inspect the quarantine queue and follow **Status History** from a blood
+unit or queue row. History records previous/new status, actor and timestamp;
+returning to quarantine starts a new elapsed-time clock.
+
+Run `python manage.py migrate` for the new structured history table. Existing text
+notes remain available. Units with status history are protected from deletion.
+Programmatic status changes must use `unit.save(actor=staff_user)` rather than
+queryset/bulk status updates. See [rules, retention and API endpoints](docs/quarantine-status-history.md).
