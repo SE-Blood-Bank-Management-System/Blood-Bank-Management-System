@@ -13,7 +13,7 @@ import uuid
 from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import models
+from django.db import models, router, transaction
 from django.utils import timezone
 
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS, validate_blood_group
@@ -105,6 +105,26 @@ class BloodUnitQuerySet(models.QuerySet):
     def discarded(self):
         """Returns units that have been marked Discarded (BBMS-F-027)."""
         return self.filter(status=BloodUnitStatus.DISCARDED)
+
+    def update(self, **kwargs):
+        if 'status' in kwargs:
+            raise ValidationError('Use BloodUnit.save(actor=...) to preserve status history.')
+        return super().update(**kwargs)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        if 'status' in fields:
+            raise ValidationError('Use BloodUnit.save(actor=...) to preserve status history.')
+        return super().bulk_update(objs, fields, batch_size=batch_size)
+
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
+                    update_fields=None, unique_fields=None):
+        if ignore_conflicts or update_conflicts:
+            raise ValidationError('Conflicting bulk imports cannot bypass status history.')
+        objs = list(objs)
+        with transaction.atomic(using=self.db):
+            for obj in objs:
+                obj.save(force_insert=True, using=self.db, status_reason='Bulk collection import.')
+        return objs
 
 
 class BloodUnit(models.Model):
@@ -209,6 +229,7 @@ class BloodUnit(models.Model):
         blank=True,
         help_text='Audit log of status transitions and serology outcomes (SRS BBMS-F-029)'
     )
+    quarantined_at = models.DateTimeField(null=True, blank=True, db_index=True, editable=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -313,7 +334,7 @@ class BloodUnit(models.Model):
             location=location,
             collection_notes=notes,
         )
-        unit.save()
+        unit.save(actor=staff_user, status_reason='Blood collection recorded.')
         return unit
 
     @property
@@ -398,8 +419,8 @@ class BloodUnit(models.Model):
         """
         if not self.is_quarantined:
             return None
-        elapsed = timezone.now() - self.collection_date
-        return round(elapsed.total_seconds() / 86400, 1)
+        elapsed = timezone.now() - (self.quarantined_at or self.collection_date)
+        return max(0, round(elapsed.total_seconds() / 86400, 1))
 
     def clean(self):
         super().clean()
@@ -425,33 +446,79 @@ class BloodUnit(models.Model):
                         "(SRS BBMS-F-024, BBMS-F-026)."
                     )
 
-    def save(self, *args, **kwargs):
-        if not self.bag_id:
-            self.bag_id = self.generate_unique_bag_id()
-        if not self.expiry_date and self.component_type:
-            self.expiry_date = self.calculate_default_expiry(self.component_type, self.collection_date)
-        self.clean()
-        super().save(*args, **kwargs)
+    def save(self, *args, actor=None, status_reason='', **kwargs):
+        fields = kwargs.get('update_fields')
+        if fields is not None and not fields:
+            return
+        using = kwargs.get('using') or router.db_for_write(type(self), instance=self)
+        kwargs['using'] = using
+        with transaction.atomic(using=using):
+            old = None
+            if self.pk:
+                old = type(self).objects.using(using).select_for_update().filter(pk=self.pk).values(
+                    'status', 'status_audit_log', 'quarantined_at',
+                ).first()
+            writes_status = fields is None or 'status' in fields
+            changed = writes_status and (old is None or old['status'] != self.status)
+            now = timezone.now()
+            if old:
+                # A stale instance must never overwrite the existing audit notes.
+                self.status_audit_log = old['status_audit_log']
+                self.quarantined_at = old['quarantined_at']
+            if writes_status:
+                if self.status not in BloodUnitStatus.values:
+                    raise ValidationError('Unknown blood-unit status.')
+                if self.status == BloodUnitStatus.QUARANTINED:
+                    if old is None:
+                        self.quarantined_at = self.collection_date
+                    elif changed:
+                        self.quarantined_at = now
+                else:
+                    self.quarantined_at = None
+            actor = actor or getattr(self, '_status_actor', None)
+            if actor is None and old is None:
+                actor = self.collected_by
+            if changed and actor is not None:
+                permitted = actor.is_active and (
+                    actor.role in ('STAFF', 'ADMIN') or actor.is_staff or actor.is_superuser
+                )
+                if not permitted:
+                    raise PermissionDenied('Only authorized staff can record a status change.')
+            reason = status_reason or getattr(self, '_status_reason', '')
+            actor_label = actor.get_username() if actor is not None else 'System'
+            if changed and old:
+                entry = (
+                    f"[{now:%Y-%m-%d %H:%M:%S}] Status transitioned from '{old['status']}' "
+                    f"to '{self.status}' by {actor_label}."
+                )
+                if reason:
+                    entry += f' Reason: {reason}'
+                self.status_audit_log = '\n'.join(filter(None, [self.status_audit_log, entry]))
+            if not self.bag_id:
+                self.bag_id = self.generate_unique_bag_id()
+            if not self.expiry_date and self.component_type:
+                self.expiry_date = self.calculate_default_expiry(self.component_type, self.collection_date)
+            if fields is not None and writes_status:
+                kwargs['update_fields'] = set(fields) | {'quarantined_at', 'status_audit_log'}
+            self.clean()
+            super().save(*args, **kwargs)
+            if changed:
+                StatusChange.objects.using(using).create(
+                    blood_unit=self, previous_status=old['status'] if old else '', new_status=self.status,
+                    changed_by=actor, actor_label=actor_label, changed_at=now,
+                    reason=reason or ('Collection recorded.' if old is None else 'Status changed.'),
+                )
+        self.__dict__.pop('_status_actor', None)
+        self.__dict__.pop('_status_reason', None)
 
     def log_status_change(self, old_status, new_status, actor=None, reason=''):
         """
         Logs status transition audit trail per SRS BBMS-F-029.
         Logs identity of the staff member and timestamp whenever unit status changes to or from Quarantined.
         """
-        if old_status == new_status:
-            return
-        timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
-        actor_display = getattr(actor, 'username', 'Staff') if actor else 'System'
-        entry = (
-            f"[{timestamp_str}] Status transitioned from '{old_status}' to '{new_status}' "
-            f"by {actor_display}."
-        )
-        if reason:
-            entry += f" Reason: {reason}"
-        if self.status_audit_log:
-            self.status_audit_log += f"\n{entry}"
-        else:
-            self.status_audit_log = entry
+        # Persist only with save(), comparing against the locked database row.
+        self._status_actor = actor
+        self._status_reason = reason
 
     def evaluate_serology_status(self, actor=None, save=True):
         """
@@ -516,6 +583,7 @@ class BloodUnit(models.Model):
             self.save()
         return self.status, f"Unit remains Quarantined pending tests: {', '.join(missing_tests)}."
 
+    @transaction.atomic
     def record_serology_test(self, test_type, result, staff_user=None, notes=''):
         """
         Records a single serology test result with staff authorization verification (BBMS-F-025, BBMS-SR-003).
@@ -545,6 +613,8 @@ class BloodUnit(models.Model):
                 f"Invalid serology result '{result}'. Must be 'Pass' or 'Fail' (SRS BBMS-F-025)."
             )
 
+        type(self).objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
         test_obj, _ = SerologyTest.objects.update_or_create(
             blood_unit=self,
             test_type=test_type,
@@ -558,6 +628,7 @@ class BloodUnit(models.Model):
         self.evaluate_serology_status(actor=staff_user, save=True)
         return test_obj
 
+    @transaction.atomic
     def record_serology_panel(self, results_dict, staff_user=None, notes=''):
         """
         Records results for multiple or all required serology tests at once (BBMS-F-024, BBMS-F-025).
@@ -576,6 +647,8 @@ class BloodUnit(models.Model):
                     "(SRS BBMS-F-025, BBMS-SR-003)."
                 )
 
+        type(self).objects.select_for_update().get(pk=self.pk)
+        self.refresh_from_db()
         recorded = {}
         for t_type, res in results_dict.items():
             if not res:
@@ -657,6 +730,60 @@ class BloodUnit(models.Model):
     def __str__(self):
         bg = self.blood_group or "Pending"
         return f"{self.bag_id} ({bg}) - {self.component_type} [{self.status}]"
+
+
+class StatusChangeQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        # Account deletion may unlink the FK; the recorded username stays intact.
+        if kwargs == {'changed_by': None}:
+            return super().update(**kwargs)
+        raise ValidationError('Status history is read-only.')
+
+    def delete(self):
+        raise ValidationError('Status history cannot be deleted.')
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError('Status history is read-only.')
+
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
+                    update_fields=None, unique_fields=None):
+        if ignore_conflicts or update_conflicts:
+            raise ValidationError('Status history cannot be overwritten by a bulk import.')
+        return super().bulk_create(objs, batch_size=batch_size)
+
+
+class StatusChange(models.Model):
+    """Append-only status history with a staff-name snapshot (Issue #14)."""
+    blood_unit = models.ForeignKey(BloodUnit, on_delete=models.PROTECT, related_name='status_changes')
+    previous_status = models.CharField(max_length=20, choices=BloodUnitStatus.choices, blank=True)
+    new_status = models.CharField(max_length=20, choices=BloodUnitStatus.choices)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    actor_label = models.CharField(max_length=150)
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    reason = models.TextField(blank=True)
+
+    objects = StatusChangeQuerySet.as_manager()
+
+    class Meta:
+        ordering = ['-changed_at', '-pk']
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(previous_status=models.F('new_status')),
+                name='status_change_requires_different_states',
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Status history is read-only.')
+        kwargs['force_insert'] = True
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Status history cannot be deleted.')
+
+    def __str__(self):
+        return f'{self.blood_unit.bag_id}: {self.previous_status or "Initial"} -> {self.new_status}'
 
 
 class SerologyTest(models.Model):

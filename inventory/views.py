@@ -11,10 +11,12 @@ import json
 from datetime import timedelta
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_safe
 
 from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
@@ -39,7 +41,7 @@ def inventory_dashboard(request):
     now = timezone.now()
     soon_threshold = now + timedelta(days=7)
 
-    available_units_qs = BloodUnit.objects.filter(status=BloodUnitStatus.AVAILABLE)
+    available_units_qs = BloodUnit.objects.available()
     total_units_available = available_units_qs.count()
     quarantined_units = BloodUnit.objects.filter(status=BloodUnitStatus.QUARANTINED).count()
     expiring_soon_count = available_units_qs.filter(
@@ -81,21 +83,56 @@ def inventory_dashboard(request):
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_safe
 def quarantine_list(request):
     """
     List units pending serology testing or under quarantine.
     Displays elapsed quarantine time, Bag ID, and lab-confirmed vs self-reported blood group.
     SRS: 4.8, 4.9 (BBMS-F-026 to BBMS-F-030).
     """
-    quarantined_qs = BloodUnit.objects.filter(
-        status=BloodUnitStatus.QUARANTINED
-    ).select_related('donor', 'lab_confirmed_by').order_by('-collection_date')
+    quarantined_qs = BloodUnit.objects.quarantined().select_related(
+        'donor', 'lab_confirmed_by',
+    ).order_by('quarantined_at', 'collection_date', 'pk')
+    page = Paginator(quarantined_qs, 25).get_page(request.GET.get('page'))
+    if _is_api_request(request):
+        return JsonResponse({
+            'count': page.paginator.count, 'page': page.number, 'pages': page.paginator.num_pages,
+            'units': [{
+                'bag_id': unit.bag_id, 'blood_group': unit.blood_group or None,
+                'collection_date': unit.collection_date.isoformat(),
+                'quarantined_at': (unit.quarantined_at or unit.collection_date).isoformat(),
+                'quarantine_duration_days': unit.quarantine_duration_days,
+            } for unit in page],
+        })
 
     context = {
         'title': 'Quarantine & Serology Testing',
-        'quarantined_units': quarantined_qs,
+        'quarantined_units': page,
+        'page_obj': page,
+        'quarantine_count': page.paginator.count,
     }
     return render(request, 'inventory/quarantine.html', context)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_safe
+def status_history(request, bag_id):
+    unit = get_object_or_404(BloodUnit, bag_id=bag_id)
+    page = Paginator(unit.status_changes.select_related('changed_by'), 25).get_page(request.GET.get('page'))
+    if _is_api_request(request):
+        return JsonResponse({
+            'bag_id': unit.bag_id, 'count': page.paginator.count, 'page': page.number,
+            'pages': page.paginator.num_pages,
+            'history': [{
+                'previous_status': event.previous_status or None, 'new_status': event.new_status,
+                'staff_id': event.changed_by_id, 'staff_username': event.actor_label,
+                'timestamp': event.changed_at.isoformat(), 'reason': event.reason,
+            } for event in page],
+            'legacy_notes': unit.status_audit_log,
+        })
+    return render(request, 'inventory/status_history.html', {'unit': unit, 'page_obj': page})
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)

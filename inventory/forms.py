@@ -157,7 +157,7 @@ class BloodCollectionForm(forms.ModelForm):
             instance.collected_by = staff_user
         instance.status = BloodUnitStatus.QUARANTINED
         if commit:
-            instance.save()
+            instance.save(actor=staff_user, status_reason='Blood collection recorded.')
         return instance
 
 

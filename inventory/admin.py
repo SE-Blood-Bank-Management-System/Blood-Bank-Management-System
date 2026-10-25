@@ -3,7 +3,7 @@ Admin registration for Blood Bank Inventory models.
 SRS BBMS-F-020 to BBMS-F-023, BBMS-F-060.
 """
 from django.contrib import admin
-from .models import BloodUnit, SerologyTest
+from .models import BloodUnit, SerologyTest, StatusChange
 
 
 class SerologyTestInline(admin.TabularInline):
@@ -29,7 +29,7 @@ class BloodUnitAdmin(admin.ModelAdmin):
     )
     list_filter = ('blood_group', 'status', 'component_type', 'location')
     search_fields = ('bag_id', 'donor__email', 'donor__username', 'blood_group_notes')
-    readonly_fields = ('lab_confirmed_at', 'created_at', 'updated_at')
+    readonly_fields = ('lab_confirmed_at', 'created_at', 'updated_at', 'quarantined_at', 'status_audit_log')
     fieldsets = (
         ('Blood Unit Identification', {
             'fields': ('bag_id', 'parent_unit', 'donor')
@@ -41,10 +41,13 @@ class BloodUnitAdmin(admin.ModelAdmin):
             'fields': ('status', 'component_type', 'volume_ml', 'location', 'collection_date', 'expiry_date')
         }),
         ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('created_at', 'updated_at', 'quarantined_at', 'status_audit_log'),
             'classes': ('collapse',)
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        obj.save(actor=request.user, status_reason='Updated through Django admin.')
 
 
 @admin.register(SerologyTest)
@@ -53,4 +56,21 @@ class SerologyTestAdmin(admin.ModelAdmin):
     list_filter = ('test_type', 'result', 'tested_at')
     search_fields = ('blood_unit__bag_id', 'tested_by__username', 'notes')
     readonly_fields = ('tested_at',)
+
+
+@admin.register(StatusChange)
+class StatusChangeAdmin(admin.ModelAdmin):
+    list_display = ('blood_unit', 'previous_status', 'new_status', 'actor_label', 'changed_at')
+    list_filter = ('new_status', 'previous_status', 'changed_at')
+    search_fields = ('blood_unit__bag_id', 'actor_label', 'reason')
+    readonly_fields = ('blood_unit', 'previous_status', 'new_status', 'changed_by', 'actor_label', 'changed_at', 'reason')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
