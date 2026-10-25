@@ -4,6 +4,7 @@ SRS BBMS-F-022, BBMS-F-023.
 """
 from django import forms
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
+from .models import BloodUnitStatus, ComponentType
 
 
 class BloodGroupCorrectionForm(forms.Form):
@@ -263,5 +264,60 @@ class SerologyPanelForm(forms.Form):
         notes = data.get('notes', '')
         blood_unit.record_serology_panel(panel, staff_user=staff_user, notes=notes)
         return blood_unit
+
+
+class InventoryFilterForm(forms.Form):
+    """
+    Filter and search form for the Blood Inventory Dashboard.
+    SRS BBMS-F-020, BBMS-F-022, BBMS-F-033, BBMS-F-034.
+    """
+    q = forms.CharField(
+        required=False,
+        label="Search",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Search by Bag ID, donor username/name, location...',
+            'id': 'id_search_query',
+        })
+    )
+    blood_group = forms.ChoiceField(
+        required=False,
+        choices=[('', 'All Blood Groups')] + list(BloodGroup.choices),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_filter_blood_group',
+        })
+    )
+    status = forms.ChoiceField(
+        required=False,
+        choices=[('', 'All Statuses')] + list(BloodUnitStatus.choices),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_filter_status',
+        })
+    )
+    location = forms.ChoiceField(
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_filter_location',
+        })
+    )
+    component_type = forms.ChoiceField(
+        required=False,
+        choices=[('', 'All Components')] + list(ComponentType.choices),
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'id_filter_component',
+        })
+    )
+
+    def __init__(self, *args, locations=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .services import get_active_locations
+        loc_list = locations if locations is not None else get_active_locations()
+        loc_choices = [('', 'All Locations')] + [(loc, loc) for loc in loc_list]
+        self.fields['location'].choices = loc_choices
+
 
 

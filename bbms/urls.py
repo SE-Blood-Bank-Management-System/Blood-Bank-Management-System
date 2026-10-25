@@ -24,6 +24,7 @@ urlpatterns = [
     path('appointments/', include('appointments.urls', namespace='appointments')),
     path('inventory/', include('inventory.urls', namespace='inventory')),
     # REST API endpoints (SAD Section 4.3)
+    path('api/inventory/', inventory_views.api_inventory, name='api_root_inventory'),
     path('api/quarantine/', inventory_views.quarantine_list, name='api_quarantine'),
     path('api/blood-units/<str:bag_id>/status-history/', inventory_views.status_history, name='api_status_history'),
     path(

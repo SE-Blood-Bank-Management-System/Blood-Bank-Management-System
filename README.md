@@ -251,7 +251,25 @@ The donor API supports `/api/donors/me`, `/api/donors/me/donations` and
 
 - **Demonstration Video & Guide**: See [demo/README.md](demo/README.md) for demonstration instructions, seed account workflows, and the 60-second video storyboard.
 - **System Deviations & Defect Backlog**: See [docs/deviations.md](docs/deviations.md) for detailed documentation of architectural refinements, SRS requirement traceability across sprints, and formally assigned defects for Sprint 2.
-## 10. Quarantine and Status History (Issue #14)
+
+---
+
+## 12. Blood Inventory Dashboard & Multi-Location Stock Tracking (Issue #13)
+
+Staff and administrators can track available blood units in real-time across the eight
+ABO/Rh blood groups and distinct storage locations, filter inventory by blood group,
+status, location, and component, and perform sub-2-second full-text searches.
+
+- **Available Stock Matrices**: Live counts grouped by blood group and storage location, plus component breakdown (Whole Blood, RBC, Platelets, Plasma).
+- **Safety Enforcement**: Quarantined, Discarded, and Expired units are strictly excluded from available counts (`BBMS-F-028`).
+- **Dynamic Updates**: Available inventory counts increment automatically upon passing serology infection testing (`BBMS-F-036`).
+- **REST API Endpoint**: `GET /api/inventory/` returns JSON stock matrices, location summaries, and paginated unit search results (SAD Section 4.3).
+
+See full architecture, endpoints, and verification in [docs/inventory-dashboard.md](docs/inventory-dashboard.md).
+
+---
+
+## 13. Quarantine and Status History (Issue #14)
 
 Staff can inspect the quarantine queue and follow **Status History** from a blood
 unit or queue row. History records previous/new status, actor and timestamp;

@@ -9,6 +9,7 @@ app_name = 'inventory'
 
 urlpatterns = [
     path('', views.inventory_dashboard, name='dashboard'),
+    path('api/', views.api_inventory, name='api_inventory'),
     path('collection/record/', views.record_blood_collection, name='record_collection'),
     path('quarantine/', views.quarantine_list, name='quarantine'),
     path('blood-units/<str:bag_id>/', views.blood_unit_detail, name='unit_detail'),

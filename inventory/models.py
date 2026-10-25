@@ -238,6 +238,11 @@ class BloodUnit(models.Model):
         ordering = ['-collection_date']
         verbose_name = 'Blood Unit'
         verbose_name_plural = 'Blood Units'
+        indexes = [
+            models.Index(fields=['status', 'blood_group', 'location']),
+            models.Index(fields=['blood_group']),
+            models.Index(fields=['location']),
+        ]
 
     objects = BloodUnitQuerySet.as_manager()
 
