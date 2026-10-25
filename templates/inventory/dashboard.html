@@ -1,108 +1,346 @@
 {% extends 'base.html' %}
 
-{% block title %}Blood Inventory - BBMS{% endblock %}
+{% block title %}Blood Inventory Dashboard - BBMS{% endblock %}
 
 {% block content %}
 <div class="container py-2">
+  <!-- Header & Actions -->
   <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
       <h2 class="fw-bold mb-1"><i class="bi bi-box-seam text-danger me-2"></i>Blood Inventory Dashboard</h2>
-      <p class="text-muted mb-0">Real-time stock levels across all eight ABO/Rh blood groups, FEFO order management, and component tracking (SRS 4.7, 4.11, 4.12)</p>
+      <p class="text-muted mb-0">
+        Real-time tracking of available blood units grouped by blood group and storage location, quarantine compliance, and FEFO expiry management (SRS 4.7, 4.8, 4.11, 4.12)
+      </p>
     </div>
     <div class="d-flex gap-2">
+      <a href="{% url 'inventory:record_collection' %}" class="btn btn-danger">
+        <i class="bi bi-plus-circle me-1"></i>Record Collection
+      </a>
       <a href="{% url 'inventory:quarantine' %}" class="btn btn-outline-warning text-dark">
         <i class="bi bi-shield-exclamation me-1"></i>Quarantine &amp; Testing
       </a>
     </div>
   </div>
 
-  <!-- Key Metrics Row -->
-  <div class="row g-4 mb-4">
-    <div class="col-md-4">
-      <div class="card border-0 shadow-sm p-3 bg-white">
+  <!-- Key Metrics Summary Row (BBMS-F-028, BBMS-F-033, BBMS-F-037) -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 bg-white h-100">
         <div class="d-flex align-items-center gap-3">
           <div class="card-icon mb-0 bg-success-subtle text-success"><i class="bi bi-check-circle-fill"></i></div>
           <div>
-            <div class="text-muted small">Available Units (Tested Pass)</div>
-            <div class="fs-4 fw-bold">{{ total_units_available }}</div>
+            <div class="text-muted small">Available Units</div>
+            <div class="fs-4 fw-bold text-success">{{ total_units_available }}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">Cleared &amp; Tested Pass</div>
           </div>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card border-0 shadow-sm p-3 bg-white">
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 bg-white h-100">
         <div class="d-flex align-items-center gap-3">
           <div class="card-icon mb-0 bg-warning-subtle text-warning"><i class="bi bi-hourglass-split"></i></div>
           <div>
-            <div class="text-muted small">Quarantined / Untested (SRS BBMS-F-026)</div>
-            <div class="fs-4 fw-bold">{{ quarantined_units }}</div>
+            <div class="text-muted small">Quarantined / Untested</div>
+            <div class="fs-4 fw-bold text-warning">{{ quarantined_units }}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">Excluded from Availability</div>
           </div>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card border-0 shadow-sm p-3 bg-white">
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 bg-white h-100">
         <div class="d-flex align-items-center gap-3">
-          <div class="card-icon mb-0 bg-danger-subtle text-danger"><i class="bi bi-clock-history"></i></div>
+          <div class="card-icon mb-0 bg-danger-subtle text-danger"><i class="bi bi-x-octagon-fill"></i></div>
           <div>
-            <div class="text-muted small">FEFO Expiries Within 7 Days (SRS BBMS-F-037)</div>
-            <div class="fs-4 fw-bold">{{ expiring_soon_count }}</div>
+            <div class="text-muted small">Discarded Units</div>
+            <div class="fs-4 fw-bold text-danger">{{ discarded_units }}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">Failed Serology / Unsafe</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="card border-0 shadow-sm p-3 bg-white h-100">
+        <div class="d-flex align-items-center gap-3">
+          <div class="card-icon mb-0 bg-info-subtle text-info"><i class="bi bi-clock-history"></i></div>
+          <div>
+            <div class="text-muted small">Expiring Within 7 Days</div>
+            <div class="fs-4 fw-bold text-info">{{ expiring_soon_count }}</div>
+            <div class="text-muted" style="font-size: 0.75rem;">First-Expiry-First-Out (FEFO)</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Component & Blood Group Inventory Grid -->
+  <!-- Tabbed Stock Breakdown Matrix: Location Breakdown + Component Breakdown -->
   <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-      <h5 class="fw-bold mb-0">Stock by ABO/Rh Blood Group (SRS BBMS-F-022, BBMS-F-033)</h5>
-      <span class="badge bg-light text-dark border">First-Expiry-First-Out (FEFO) Enabled</span>
+    <div class="card-header bg-white py-3">
+      <ul class="nav nav-pills card-header-pills" id="inventoryTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active fw-semibold" id="location-tab" data-bs-toggle="pill" data-bs-target="#tab-location" type="button" role="tab" aria-controls="tab-location" aria-selected="true">
+            <i class="bi bi-geo-alt me-1 text-danger"></i>Available Stock by Location &amp; Blood Group (SRS BBMS-F-033)
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="component-tab" data-bs-toggle="pill" data-bs-target="#tab-component" type="button" role="tab" aria-controls="tab-component" aria-selected="false">
+            <i class="bi bi-pie-chart me-1 text-primary"></i>Stock by Component Type (SRS BBMS-F-022, BBMS-F-031)
+          </button>
+        </li>
+      </ul>
     </div>
     <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th scope="col" class="ps-4">Blood Group</th>
-              <th scope="col">Whole Blood</th>
-              <th scope="col">Red Blood Cells (RBC)</th>
-              <th scope="col">Platelets</th>
-              <th scope="col">Fresh Frozen Plasma</th>
-              <th scope="col">Total Available</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in stock_matrix %}
-              <tr>
-                <td class="ps-4"><span class="blood-badge">{{ item.blood_group }}</span></td>
-                <td>{{ item.whole_blood }} units</td>
-                <td>{{ item.rbc }} units</td>
-                <td>{{ item.platelets }} units</td>
-                <td>{{ item.plasma }} units</td>
-                <td>
-                  <span class="badge {% if item.total > 0 %}bg-success{% else %}bg-secondary{% endif %}">
-                    {{ item.total }} units
-                  </span>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="tab-content" id="inventoryTabContent">
+        <!-- Tab 1: Available Stock by Location & Blood Group (Issue #13 Acceptance Criteria) -->
+        <div class="tab-pane fade show active" id="tab-location" role="tabpanel" aria-labelledby="location-tab">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" class="text-start ps-4">Storage Location</th>
+                  {% for bg in blood_groups %}
+                    <th scope="col"><span class="blood-badge py-1 px-2" style="font-size: 0.8rem;">{{ bg }}</span></th>
+                  {% endfor %}
+                  <th scope="col" class="pe-4 text-end">Total Available</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for loc in location_matrix %}
+                  <tr>
+                    <td class="text-start ps-4 fw-semibold">
+                      <i class="bi bi-building me-1 text-secondary"></i>
+                      <a href="?location={{ loc.location }}" class="text-decoration-none text-dark" title="Filter inventory by this location">
+                        {{ loc.location }}
+                      </a>
+                    </td>
+                    {% for item in loc.group_counts %}
+                      <td>
+                        {% if item.count and item.count > 0 %}
+                          <span class="badge bg-success-subtle text-success border border-success-subtle fw-semibold px-2 py-1">
+                            {{ item.count }}
+                          </span>
+                        {% else %}
+                          <span class="text-muted small">0</span>
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                    <td class="pe-4 text-end">
+                      <span class="badge {% if loc.total > 0 %}bg-success{% else %}bg-secondary{% endif %} px-2 py-1">
+                        {{ loc.total }} units
+                      </span>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="10" class="text-center py-4 text-muted">No storage locations registered yet.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-bold">
+                <tr>
+                  <td class="text-start ps-4">Grand Total (All Locations)</td>
+                  {% for item in loc_grand_totals_list %}
+                    <td>
+                      <span class="badge bg-secondary px-2 py-1">{{ item.total }}</span>
+                    </td>
+                  {% endfor %}
+                  <td class="pe-4 text-end">
+                    <span class="badge bg-primary px-3 py-1 fs-6">{{ loc_grand_totals.all }} units</span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Stock by Blood Group & Components (FEFO Enabled) -->
+        <div class="tab-pane fade" id="tab-component" role="tabpanel" aria-labelledby="component-tab">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col" class="text-start ps-4">Blood Group</th>
+                  <th scope="col">Whole Blood</th>
+                  <th scope="col">Red Blood Cells (RBC)</th>
+                  <th scope="col">Platelets</th>
+                  <th scope="col">Fresh Frozen Plasma</th>
+                  <th scope="col" class="pe-4 text-end">Total Available</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in stock_matrix %}
+                  <tr>
+                    <td class="text-start ps-4">
+                      <span class="blood-badge py-1 px-2 fs-6">{{ item.blood_group }}</span>
+                    </td>
+                    <td>{{ item.whole_blood }} units</td>
+                    <td>{{ item.rbc }} units</td>
+                    <td>{{ item.platelets }} units</td>
+                    <td>{{ item.plasma }} units</td>
+                    <td class="pe-4 text-end">
+                      <span class="badge {% if item.total > 0 %}bg-success{% else %}bg-secondary{% endif %} px-2 py-1">
+                        {{ item.total }} units
+                      </span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light fw-bold">
+                <tr>
+                  <td class="text-start ps-4">Total Available by Component</td>
+                  <td>{{ grand_component_totals.whole_blood }} units</td>
+                  <td>{{ grand_component_totals.rbc }} units</td>
+                  <td>{{ grand_component_totals.platelets }} units</td>
+                  <td>{{ grand_component_totals.plasma }} units</td>
+                  <td class="pe-4 text-end">
+                    <span class="badge bg-primary px-3 py-1 fs-6">{{ grand_component_totals.total }} units</span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Blood Units List & Blood Group Management -->
+  <!-- Filter & Search Panel (SRS BBMS-F-020, BBMS-F-034, Issue #13) -->
   <div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <div class="card-body p-3">
+      <form method="GET" action="{% url 'inventory:dashboard' %}" class="row g-2 align-items-end">
+        <div class="col-lg-3 col-md-6">
+          <label for="id_search_query" class="form-label small fw-semibold text-muted mb-1">
+            <i class="bi bi-search me-1"></i>Search Records
+          </label>
+          <input type="text" name="q" id="id_search_query" class="form-control"
+                 placeholder="Search Bag ID, donor, location..."
+                 value="{{ selected_filters.q }}">
+        </div>
+
+        <div class="col-lg-2 col-md-3 col-6">
+          <label for="id_filter_blood_group" class="form-label small fw-semibold text-muted mb-1">
+            <i class="bi bi-droplet me-1"></i>Blood Group
+          </label>
+          <select name="blood_group" id="id_filter_blood_group" class="form-select">
+            <option value="">All Blood Groups</option>
+            {% for bg in blood_groups %}
+              <option value="{{ bg }}" {% if selected_filters.blood_group == bg %}selected{% endif %}>{{ bg }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-3 col-6">
+          <label for="id_filter_status" class="form-label small fw-semibold text-muted mb-1">
+            <i class="bi bi-shield-check me-1"></i>Status
+          </label>
+          <select name="status" id="id_filter_status" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Available" {% if selected_filters.status == 'Available' %}selected{% endif %}>Available</option>
+            <option value="Quarantined" {% if selected_filters.status == 'Quarantined' %}selected{% endif %}>Quarantined</option>
+            <option value="Discarded" {% if selected_filters.status == 'Discarded' %}selected{% endif %}>Discarded</option>
+            <option value="Allocated" {% if selected_filters.status == 'Allocated' %}selected{% endif %}>Allocated</option>
+            <option value="Dispatched" {% if selected_filters.status == 'Dispatched' %}selected{% endif %}>Dispatched</option>
+            <option value="Delivered" {% if selected_filters.status == 'Delivered' %}selected{% endif %}>Delivered</option>
+            <option value="Expired" {% if selected_filters.status == 'Expired' %}selected{% endif %}>Expired</option>
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+          <label for="id_filter_location" class="form-label small fw-semibold text-muted mb-1">
+            <i class="bi bi-geo-alt me-1"></i>Location
+          </label>
+          <select name="location" id="id_filter_location" class="form-select">
+            <option value="">All Locations</option>
+            {% for loc in active_locations %}
+              <option value="{{ loc }}" {% if selected_filters.location == loc %}selected{% endif %}>{{ loc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+          <label for="id_filter_component" class="form-label small fw-semibold text-muted mb-1">
+            <i class="bi bi-box me-1"></i>Component
+          </label>
+          <select name="component_type" id="id_filter_component" class="form-select">
+            <option value="">All Components</option>
+            <option value="Whole Blood" {% if selected_filters.component_type == 'Whole Blood' %}selected{% endif %}>Whole Blood</option>
+            <option value="Red Blood Cells" {% if selected_filters.component_type == 'Red Blood Cells' %}selected{% endif %}>Red Blood Cells</option>
+            <option value="Platelets" {% if selected_filters.component_type == 'Platelets' %}selected{% endif %}>Platelets</option>
+            <option value="Fresh Frozen Plasma" {% if selected_filters.component_type == 'Fresh Frozen Plasma' %}selected{% endif %}>Fresh Frozen Plasma</option>
+          </select>
+        </div>
+
+        <div class="col-lg-1 col-md-4 col-12 d-flex gap-1">
+          <button type="submit" class="btn btn-primary w-100" title="Apply filters">
+            <i class="bi bi-funnel-fill"></i>
+          </button>
+          {% if has_active_filters %}
+            <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary" title="Reset all filters">
+              <i class="bi bi-x-circle"></i>
+            </a>
+          {% endif %}
+        </div>
+      </form>
+
+      <!-- Active Filter Pills -->
+      {% if has_active_filters %}
+        <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top flex-wrap">
+          <span class="text-muted small fw-semibold">Active Filters:</span>
+          {% if selected_filters.q %}
+            <span class="badge bg-light text-dark border">
+              Search: "{{ selected_filters.q }}"
+              <a href="?{% if selected_filters.blood_group %}blood_group={{ selected_filters.blood_group }}&{% endif %}{% if selected_filters.status %}status={{ selected_filters.status }}&{% endif %}{% if selected_filters.location %}location={{ selected_filters.location }}&{% endif %}{% if selected_filters.component_type %}component_type={{ selected_filters.component_type }}{% endif %}" class="text-muted ms-1 text-decoration-none">&times;</a>
+            </span>
+          {% endif %}
+          {% if selected_filters.blood_group %}
+            <span class="badge bg-light text-dark border">
+              Group: {{ selected_filters.blood_group }}
+              <a href="?{% if selected_filters.q %}q={{ selected_filters.q }}&{% endif %}{% if selected_filters.status %}status={{ selected_filters.status }}&{% endif %}{% if selected_filters.location %}location={{ selected_filters.location }}&{% endif %}{% if selected_filters.component_type %}component_type={{ selected_filters.component_type }}{% endif %}" class="text-muted ms-1 text-decoration-none">&times;</a>
+            </span>
+          {% endif %}
+          {% if selected_filters.status %}
+            <span class="badge bg-light text-dark border">
+              Status: {{ selected_filters.status }}
+              <a href="?{% if selected_filters.q %}q={{ selected_filters.q }}&{% endif %}{% if selected_filters.blood_group %}blood_group={{ selected_filters.blood_group }}&{% endif %}{% if selected_filters.location %}location={{ selected_filters.location }}&{% endif %}{% if selected_filters.component_type %}component_type={{ selected_filters.component_type }}{% endif %}" class="text-muted ms-1 text-decoration-none">&times;</a>
+            </span>
+          {% endif %}
+          {% if selected_filters.location %}
+            <span class="badge bg-light text-dark border">
+              Location: {{ selected_filters.location }}
+              <a href="?{% if selected_filters.q %}q={{ selected_filters.q }}&{% endif %}{% if selected_filters.blood_group %}blood_group={{ selected_filters.blood_group }}&{% endif %}{% if selected_filters.status %}status={{ selected_filters.status }}&{% endif %}{% if selected_filters.component_type %}component_type={{ selected_filters.component_type }}{% endif %}" class="text-muted ms-1 text-decoration-none">&times;</a>
+            </span>
+          {% endif %}
+          {% if selected_filters.component_type %}
+            <span class="badge bg-light text-dark border">
+              Component: {{ selected_filters.component_type }}
+              <a href="?{% if selected_filters.q %}q={{ selected_filters.q }}&{% endif %}{% if selected_filters.blood_group %}blood_group={{ selected_filters.blood_group }}&{% endif %}{% if selected_filters.status %}status={{ selected_filters.status }}&{% endif %}{% if selected_filters.location %}location={{ selected_filters.location }}{% endif %}" class="text-muted ms-1 text-decoration-none">&times;</a>
+            </span>
+          {% endif %}
+          <a href="{% url 'inventory:dashboard' %}" class="text-danger small text-decoration-none ms-auto">
+            Clear all filters
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Blood Units Searchable Registry (SRS BBMS-F-020, BBMS-F-034, Issue #13) -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div>
         <h5 class="fw-bold mb-0 text-dark">
-          <i class="bi bi-droplet text-danger me-2"></i>Blood Unit Registry &amp; Blood Group Verification
+          <i class="bi bi-droplet text-danger me-2"></i>Blood Unit Registry &amp; Inventory Records
         </h5>
-        <small class="text-muted">View blood units and manage laboratory-confirmed blood groups (SRS BBMS-F-020–F-023)</small>
+        <small class="text-muted">
+          Detailed unit records with lab blood group, location, and lifecycle status (SRS BBMS-F-020 to BBMS-F-034)
+        </small>
       </div>
-      <span class="badge bg-light text-secondary border">Total Logged: {{ recent_units|length }}</span>
+      <div>
+        <span class="badge bg-light text-secondary border">
+          Matching Units: {{ total_filtered_units }}
+        </span>
+      </div>
     </div>
     <div class="card-body p-0">
       {% if recent_units %}
@@ -111,11 +349,12 @@
             <thead class="table-light">
               <tr>
                 <th scope="col" class="ps-4">Bag ID</th>
-                <th scope="col">Lab Blood Group</th>
-                <th scope="col">Donor Self-Report</th>
+                <th scope="col">Blood Group</th>
                 <th scope="col">Component</th>
                 <th scope="col">Volume</th>
                 <th scope="col">Status</th>
+                <th scope="col">Storage Location</th>
+                <th scope="col">Expiry Date (FEFO)</th>
                 <th scope="col">Collection Date</th>
                 <th scope="col" class="text-end pe-4">Actions</th>
               </tr>
@@ -124,7 +363,7 @@
               {% for unit in recent_units %}
                 <tr>
                   <td class="ps-4 font-monospace fw-bold">
-                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="text-decoration-none">
+                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="text-decoration-none" title="View Blood Unit details">
                       {{ unit.bag_id }}
                     </a>
                   </td>
@@ -134,37 +373,109 @@
                     {% else %}
                       <span class="badge bg-warning text-dark">Pending</span>
                     {% endif %}
-                  </td>
-                  <td>
-                    {% if unit.donor_self_reported_group %}
-                      <span class="badge bg-light text-dark border">{{ unit.donor_self_reported_group }}</span>
-                    {% else %}
-                      <span class="text-muted small">N/A</span>
+                    {% if unit.donor_self_reported_group and unit.donor_self_reported_group != unit.blood_group %}
+                      <span class="badge bg-light text-secondary border ms-1" title="Donor self-reported: {{ unit.donor_self_reported_group }}">
+                        Self: {{ unit.donor_self_reported_group }}
+                      </span>
                     {% endif %}
                   </td>
                   <td>{{ unit.component_type }}</td>
                   <td>{{ unit.volume_ml }} mL</td>
                   <td>
-                    <span class="badge {% if unit.status == 'Available' %}bg-success{% elif unit.status == 'Quarantined' %}bg-warning text-dark{% elif unit.status == 'Discarded' %}bg-danger{% else %}bg-secondary{% endif %}">
-                      {{ unit.status }}
+                    {% if unit.status == 'Available' %}
+                      <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Available</span>
+                    {% elif unit.status == 'Quarantined' %}
+                      <span class="badge bg-warning text-dark"><i class="bi bi-hourglass me-1"></i>Quarantined</span>
+                    {% elif unit.status == 'Discarded' %}
+                      <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Discarded</span>
+                    {% elif unit.status == 'Expired' %}
+                      <span class="badge bg-dark"><i class="bi bi-clock me-1"></i>Expired</span>
+                    {% elif unit.status == 'Allocated' %}
+                      <span class="badge bg-info text-dark"><i class="bi bi-box-arrow-right me-1"></i>Allocated</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ unit.status }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="small text-secondary">
+                      <i class="bi bi-geo-alt me-1 text-danger"></i>{{ unit.location }}
                     </span>
+                  </td>
+                  <td class="small">
+                    {% if unit.expiry_date %}
+                      <span class="{% if unit.is_expired %}text-danger fw-bold{% elif unit.expiry_date <= soon_threshold %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                        {{ unit.expiry_date|date:"d M Y" }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
                   </td>
                   <td class="small text-muted">{{ unit.collection_date|date:"d M Y, H:i" }}</td>
                   <td class="text-end pe-4">
-                    <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-sm btn-outline-danger">
-                      <i class="bi bi-pencil-square me-1"></i>Manage Group
-                    </a>
+                    <div class="btn-group btn-group-sm">
+                      <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-outline-secondary" title="View details &amp; blood group">
+                        <i class="bi bi-eye"></i>
+                      </a>
+                      {% if unit.status == 'Quarantined' %}
+                        <a href="{% url 'inventory:record_serology' unit.bag_id %}" class="btn btn-outline-warning text-dark" title="Record serology testing">
+                          <i class="bi bi-shield-check"></i>
+                        </a>
+                      {% endif %}
+                      <a href="{% url 'inventory:status_history' unit.bag_id %}" class="btn btn-outline-info" title="Status history &amp; audit">
+                        <i class="bi bi-clock-history"></i>
+                      </a>
+                    </div>
                   </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination Controls Preserving Filters -->
+        {% if page_obj.has_other_pages %}
+          <nav aria-label="Inventory pagination" class="d-flex justify-content-between align-items-center p-3 border-top">
+            <span class="text-muted small">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ total_filtered_units }} units)
+            </span>
+            <ul class="pagination pagination-sm mb-0">
+              {% if page_obj.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_filters.q %}&q={{ selected_filters.q }}{% endif %}{% if selected_filters.blood_group %}&blood_group={{ selected_filters.blood_group }}{% endif %}{% if selected_filters.status %}&status={{ selected_filters.status }}{% endif %}{% if selected_filters.location %}&location={{ selected_filters.location }}{% endif %}{% if selected_filters.component_type %}&component_type={{ selected_filters.component_type }}{% endif %}">
+                    Previous
+                  </a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Previous</span></li>
+              {% endif %}
+
+              <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }}</span>
+              </li>
+
+              {% if page_obj.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_filters.q %}&q={{ selected_filters.q }}{% endif %}{% if selected_filters.blood_group %}&blood_group={{ selected_filters.blood_group }}{% endif %}{% if selected_filters.status %}&status={{ selected_filters.status }}{% endif %}{% if selected_filters.location %}&location={{ selected_filters.location }}{% endif %}{% if selected_filters.component_type %}&component_type={{ selected_filters.component_type }}{% endif %}">
+                    Next
+                  </a>
+                </li>
+              {% else %}
+                <li class="page-item disabled"><span class="page-link">Next</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+
       {% else %}
         <div class="text-center py-5 text-muted">
           <i class="bi bi-inbox fs-1 opacity-50 mb-3 d-block"></i>
-          <h6 class="fw-semibold">No blood units recorded yet</h6>
-          <p class="small text-muted mb-0">Blood units created upon donation collection will appear here for blood group confirmation and testing.</p>
+          <h6 class="fw-semibold">No blood units match the specified filters</h6>
+          <p class="small text-muted mb-3">Try adjusting your search criteria, blood group, or status filter.</p>
+          {% if has_active_filters %}
+            <a href="{% url 'inventory:dashboard' %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Filters
+            </a>
+          {% endif %}
         </div>
       {% endif %}
     </div>

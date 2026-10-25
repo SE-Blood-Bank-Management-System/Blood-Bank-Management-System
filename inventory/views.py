@@ -21,7 +21,12 @@ from django.views.decorators.http import require_http_methods, require_safe
 from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from .forms import BloodCollectionForm, BloodGroupCorrectionForm, SerologyPanelForm
+from .forms import (
+    BloodCollectionForm,
+    BloodGroupCorrectionForm,
+    InventoryFilterForm,
+    SerologyPanelForm,
+)
 from .models import (
     BloodUnit,
     BloodUnitStatus,
@@ -29,6 +34,50 @@ from .models import (
     SerologyResult,
     SerologyTestType,
 )
+from .services import (
+    filter_and_search_inventory,
+    get_active_locations,
+    get_inventory_counts,
+)
+
+
+def _normalize_blood_group(bg_raw):
+    """Normalizes blood group strings, handling URL unencoded '+' translated to space."""
+    if not bg_raw:
+        return ''
+    clean = bg_raw.strip().upper()
+    if clean in VALID_BLOOD_GROUPS:
+        return clean
+    if bg_raw.endswith(' ') and f"{clean}+" in VALID_BLOOD_GROUPS:
+        return f"{clean}+"
+    return clean
+
+
+def _serialize_blood_unit(unit):
+    """Helper to serialize a BloodUnit instance for API responses."""
+    return {
+        'id': unit.id,
+        'bag_id': unit.bag_id,
+        'blood_group': unit.blood_group,
+        'donor_self_reported_group': unit.donor_self_reported_group,
+        'status': unit.status,
+        'component_type': unit.component_type,
+        'volume_ml': unit.volume_ml,
+        'location': unit.location,
+        'collection_date': unit.collection_date.isoformat() if unit.collection_date else None,
+        'expiry_date': unit.expiry_date.isoformat() if unit.expiry_date else None,
+        'is_available': unit.is_available,
+        'is_quarantined': unit.is_quarantined,
+        'is_discarded': unit.is_discarded,
+        'is_expired': unit.is_expired,
+        'donor': {
+            'id': unit.donor.id,
+            'username': unit.donor.username,
+            'name': unit.donor.get_full_name() or unit.donor.username,
+        } if unit.donor else None,
+        'lab_confirmed_by': unit.lab_confirmed_by.username if unit.lab_confirmed_by else None,
+        'lab_confirmed_at': unit.lab_confirmed_at.isoformat() if unit.lab_confirmed_at else None,
+    }
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)
@@ -36,50 +85,152 @@ def inventory_dashboard(request):
     """
     Inventory management dashboard for staff and administrators.
     Displays units grouped by the eight ABO/Rh blood groups, component types,
-    and FEFO expiry metrics (SRS BBMS-F-022, BBMS-F-033, BBMS-F-034).
+    locations, and provides searchable, filterable inventory lists.
+
+    SRS References:
+    - BBMS-F-020, BBMS-F-021: Unique Bag ID and searching
+    - BBMS-F-022, BBMS-F-023: Blood group display and verification
+    - BBMS-F-028: Quarantined & Discarded units excluded from available stock counts
+    - BBMS-F-033: Real-time available count grouped by blood group and location
+    - BBMS-F-034: Filter by blood group, component type, and status
+    - BBMS-F-037, BBMS-F-039: Expiry handling & FEFO metrics
+    - BBMS-NF-001: Sub-2-second search and filter response time
     """
-    now = timezone.now()
-    soon_threshold = now + timedelta(days=7)
+    if _is_api_request(request):
+        return api_inventory(request)
 
-    available_units_qs = BloodUnit.objects.available()
-    total_units_available = available_units_qs.count()
-    quarantined_units = BloodUnit.objects.filter(status=BloodUnitStatus.QUARANTINED).count()
-    expiring_soon_count = available_units_qs.filter(
-        expiry_date__lte=soon_threshold,
-        expiry_date__gt=now
-    ).count()
+    q = request.GET.get('q', '').strip()
+    blood_group = _normalize_blood_group(request.GET.get('blood_group', ''))
+    status = request.GET.get('status', '').strip()
+    location = request.GET.get('location', '').strip()
+    component_type = request.GET.get('component_type', '').strip()
 
-    # Aggregate stock counts for all 8 standard blood groups and components
-    stock_matrix = []
-    for bg_val, bg_label in BloodGroup.choices:
-        wb_count = available_units_qs.filter(blood_group=bg_val, component_type=ComponentType.WHOLE_BLOOD).count()
-        rbc_count = available_units_qs.filter(blood_group=bg_val, component_type=ComponentType.RBC).count()
-        plt_count = available_units_qs.filter(blood_group=bg_val, component_type=ComponentType.PLATELETS).count()
-        ffp_count = available_units_qs.filter(blood_group=bg_val, component_type=ComponentType.PLASMA).count()
-        total_bg = wb_count + rbc_count + plt_count + ffp_count
+    # Calculate real-time counts across groups, components, and locations
+    counts_data = get_inventory_counts(location=location if location else None)
+    active_locations = counts_data['active_locations']
 
-        stock_matrix.append({
-            'blood_group': bg_val,
-            'whole_blood': wb_count,
-            'rbc': rbc_count,
-            'platelets': plt_count,
-            'plasma': ffp_count,
-            'total': total_bg,
-        })
+    # Filter and search blood units
+    filtered_qs = filter_and_search_inventory(
+        blood_group=blood_group,
+        status=status,
+        location=location,
+        component_type=component_type,
+        search_query=q,
+    )
 
-    # Recent units across all statuses
-    recent_units = BloodUnit.objects.select_related('donor', 'lab_confirmed_by').order_by('-collection_date')[:15]
+    # Initialize filter form with current parameters and active locations
+    filter_form = InventoryFilterForm(
+        request.GET or None,
+        locations=active_locations,
+        initial={
+            'q': q,
+            'blood_group': blood_group,
+            'status': status,
+            'location': location,
+            'component_type': component_type,
+        }
+    )
+
+    # Pagination: 15 units per page
+    paginator = Paginator(filtered_qs, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    has_active_filters = bool(q or blood_group or status or location or component_type)
 
     context = {
         'title': 'Blood Inventory Dashboard',
         'blood_groups': VALID_BLOOD_GROUPS,
-        'stock_matrix': stock_matrix,
-        'total_units_available': total_units_available,
-        'quarantined_units': quarantined_units,
-        'expiring_soon_count': expiring_soon_count,
-        'recent_units': recent_units,
+        'filter_form': filter_form,
+        'page_obj': page_obj,
+        'recent_units': page_obj.object_list,
+        'total_filtered_units': filtered_qs.count(),
+        'stock_matrix': counts_data['stock_matrix'],
+        'grand_component_totals': counts_data['grand_component_totals'],
+        'location_matrix': counts_data['location_matrix'],
+        'loc_grand_totals': counts_data['loc_grand_totals'],
+        'loc_grand_totals_list': counts_data['loc_grand_totals_list'],
+        'total_units_available': counts_data['total_units_available'],
+        'quarantined_units': counts_data['quarantined_units'],
+        'discarded_units': counts_data['discarded_units'],
+        'expiring_soon_count': counts_data['expiring_soon_count'],
+        'active_locations': active_locations,
+        'selected_filters': {
+            'q': q,
+            'blood_group': blood_group,
+            'status': status,
+            'location': location,
+            'component_type': component_type,
+        },
+        'has_active_filters': has_active_filters,
     }
     return render(request, 'inventory/dashboard.html', context)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["GET"])
+def api_inventory(request):
+    """
+    Dedicated REST API endpoint for blood inventory listing, counts, and search.
+    SAD Section 4.3: GET /api/inventory
+    SRS References:
+    - BBMS-F-028: Quarantined/Discarded units excluded from available stock counts.
+    - BBMS-F-033: Real-time count of available blood units per blood group and location.
+    - BBMS-F-034: Filter by blood group, component type, and status.
+    - BBMS-NF-001: Sub-2-second query response time.
+    """
+    q = request.GET.get('q', '').strip()
+    blood_group = _normalize_blood_group(request.GET.get('blood_group', ''))
+    status = request.GET.get('status', '').strip()
+    location = request.GET.get('location', '').strip()
+    component_type = request.GET.get('component_type', '').strip()
+
+    counts_data = get_inventory_counts(location=location if location else None)
+    filtered_qs = filter_and_search_inventory(
+        blood_group=blood_group,
+        status=status,
+        location=location,
+        component_type=component_type,
+        search_query=q,
+    )
+
+    # Support customizable page size for API clients
+    try:
+        page_size = min(max(int(request.GET.get('page_size', 20)), 1), 100)
+    except (ValueError, TypeError):
+        page_size = 20
+
+    paginator = Paginator(filtered_qs, page_size)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    return JsonResponse({
+        'status': 'success',
+        'summary': {
+            'total_available': counts_data['total_units_available'],
+            'total_quarantined': counts_data['quarantined_units'],
+            'total_discarded': counts_data['discarded_units'],
+            'expiring_soon_count': counts_data['expiring_soon_count'],
+        },
+        'by_blood_group': counts_data['stock_matrix'],
+        'by_location': counts_data['location_matrix'],
+        'active_locations': counts_data['active_locations'],
+        'filters': {
+            'q': q,
+            'blood_group': blood_group,
+            'status': status,
+            'location': location,
+            'component_type': component_type,
+        },
+        'pagination': {
+            'total_count': paginator.count,
+            'page': page_obj.number,
+            'num_pages': paginator.num_pages,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+        },
+        'results': [_serialize_blood_unit(u) for u in page_obj.object_list],
+    }, status=200)
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)
