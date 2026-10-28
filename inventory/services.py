@@ -586,3 +586,84 @@ def dispatch_allocated_units(*, requisition_pk, unit_ids, actor, notes='', expec
         raise AllocationConflict('Dispatch conflicts with another concurrent change. Refresh and retry.') from exc
 
 
+def process_expired_units(as_of=None, dry_run=False, actor=None):
+    """
+    Scans blood inventory and transitions all eligible overdue units to Expired status.
+    Idempotent and safe to run on a scheduled cron or trigger.
+
+    Eligible statuses for transition:
+    - AVAILABLE: Passed shelf life without allocation.
+    - QUARANTINED: Passed shelf life while awaiting testing/clearance.
+    - ALLOCATED: Reserved for requisition but expired before dispatch.
+
+    Excludes already final or unallocatable states:
+    - EXPIRED (already expired - idempotent)
+    - DISCARDED (discarded due to failed serology)
+    - DISPATCHED, DELIVERED (units handed over to hospital)
+    - SEPARATED (source parent unit already separated)
+
+    SRS References:
+    - BBMS-F-037: Expiry date calculation per component.
+    - BBMS-F-038: Automated expiry identification.
+    - BBMS-F-039: Exclusion of expired units from available stock.
+
+    Returns:
+        dict containing 'processed_count', 'expired_units', 'as_of', and 'dry_run'.
+    """
+    now = as_of or timezone.now()
+    eligible_statuses = [
+        BloodUnitStatus.AVAILABLE,
+        BloodUnitStatus.QUARANTINED,
+        BloodUnitStatus.ALLOCATED,
+    ]
+
+    overdue_units = BloodUnit.objects.filter(
+        expiry_date__lte=now,
+        status__in=eligible_statuses
+    ).order_by('expiry_date')
+
+    processed = []
+    actor_label = actor.username if (actor and hasattr(actor, 'username')) else 'System'
+
+    for unit in overdue_units:
+        old_status = unit.status
+        expiry_str = unit.expiry_date.strftime('%Y-%m-%d %H:%M') if unit.expiry_date else 'N/A'
+
+        if old_status == BloodUnitStatus.ALLOCATED:
+            reason = (
+                f"Automated expiry: allocated unit expired prior to dispatch "
+                f"(shelf-life ended {expiry_str})."
+            )
+        elif old_status == BloodUnitStatus.QUARANTINED:
+            reason = (
+                f"Automated expiry: quarantined unit expired before testing completed "
+                f"(shelf-life ended {expiry_str})."
+            )
+        else:
+            reason = (
+                f"Automated expiry: unit exceeded shelf life (expired on {expiry_str})."
+            )
+
+        unit_info = {
+            'bag_id': unit.bag_id,
+            'previous_status': old_status,
+            'new_status': BloodUnitStatus.EXPIRED,
+            'blood_group': unit.blood_group,
+            'component_type': unit.component_type,
+            'expiry_date': unit.expiry_date,
+            'reason': reason,
+        }
+
+        if not dry_run:
+            unit.status = BloodUnitStatus.EXPIRED
+            unit.save(actor=actor, status_reason=reason)
+
+        processed.append(unit_info)
+
+    return {
+        'processed_count': len(processed),
+        'expired_units': processed,
+        'as_of': now,
+        'dry_run': dry_run,
+        'actor': actor_label,
+    }

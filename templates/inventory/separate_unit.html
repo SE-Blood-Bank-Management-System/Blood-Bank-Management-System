@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}Component Separation: {{ unit.bag_id }} - BBMS{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <h2 class="fw-bold mb-0"><i class="bi bi-diagram-3 text-primary me-2"></i>Component Separation</h2>
+        <span class="badge bg-success fs-6">Unit {{ unit.bag_id }} (Available)</span>
+      </div>
+      <p class="text-muted mb-0">Separate Safe Whole Blood into Traceable Components (SRS Section 4.10, BBMS-F-031, BBMS-F-032)</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Unit Detail
+      </a>
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-primary">
+        <i class="bi bi-grid me-1"></i>Inventory Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Traceability & Separation Policy Banner -->
+  <div class="alert alert-info d-flex align-items-start gap-3 mb-4 shadow-sm" role="alert">
+    <i class="bi bi-info-circle-fill fs-3 text-info"></i>
+    <div>
+      <h6 class="fw-bold mb-1">Traceability &amp; Shelf-Life Integrity Rules (SRS BBMS-F-031, BBMS-F-032, BBMS-F-037)</h6>
+      <ul class="mb-0 ps-3 small">
+        <li><strong>Traceability Reference:</strong> Each derived child unit receives a globally unique Bag ID and permanently links back to parent Bag ID <code>{{ unit.bag_id }}</code>.</li>
+        <li><strong>Stock Exclusion:</strong> Once separated, parent unit <code>{{ unit.bag_id }}</code> transitions to <strong>Separated</strong> status, preventing double counting in available inventory.</li>
+        <li><strong>Anchored Expiry:</strong> Child component shelf lives are anchored to source collection date <strong>{{ unit.collection_date|date:"d M Y, H:i" }}</strong> (RBC: 42 days, Platelets: 5 days, FFP: 365 days). Separation never rejuvenates expiring blood.</li>
+        <li><strong>Serology Clearance:</strong> All verified serology test records (HIV, Hep B, Hep C, Syphilis) are copied to each child component.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Column: Source Unit Information Card -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white py-3">
+          <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-droplet-half text-danger me-2"></i>Source Whole Blood Unit
+          </h5>
+          <small class="text-muted">Originating collection unit</small>
+        </div>
+        <div class="card-body p-4">
+          <table class="table table-sm table-borderless mb-3">
+            <tbody>
+              <tr>
+                <th scope="row" class="text-muted">Bag ID:</th>
+                <td class="fw-bold font-monospace">{{ unit.bag_id }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Blood Group:</th>
+                <td><span class="badge bg-danger fs-6">{{ unit.blood_group }}</span></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Component:</th>
+                <td><span class="badge bg-light text-dark border">{{ unit.component_type }}</span></td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Volume:</th>
+                <td>{{ unit.volume_ml }} mL</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Collection Date:</th>
+                <td>{{ unit.collection_date|date:"d M Y, H:i" }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Current Expiry:</th>
+                <td>{{ unit.expiry_date|date:"d M Y, H:i" }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Storage Facility:</th>
+                <td>{{ unit.location }}</td>
+              </tr>
+              <tr>
+                <th scope="row" class="text-muted">Donor:</th>
+                <td>{{ unit.donor.get_full_name|default:unit.donor.username }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="border-top pt-3">
+            <h6 class="fw-bold small text-secondary text-uppercase mb-2">Serology Clearance Status</h6>
+            <div class="d-flex flex-wrap gap-1">
+              {% for test_name, test_info in unit.serology_summary.items %}
+                <span class="badge bg-success small">
+                  <i class="bi bi-check me-1"></i>{{ test_name }}: Pass
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Component Separation Interface Form -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="fw-bold mb-0 text-primary">
+              <i class="bi bi-sliders me-2"></i>Select Derived Components to Produce
+            </h5>
+            <small class="text-muted">Configure volumes and target components for laboratory centrifugation</small>
+          </div>
+          <span class="badge bg-light text-secondary border">Role: Staff / Administrator</span>
+        </div>
+        <div class="card-body p-4">
+          <form method="post" action="{% url 'inventory:separate_unit' unit.bag_id %}">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger" role="alert">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
+
+            <!-- Component 1: Red Blood Cells -->
+            <div class="border rounded p-3 mb-3 bg-light">
+              <div class="row align-items-center g-3">
+                <div class="col-md-6">
+                  <div class="form-check form-switch fs-5">
+                    {{ form.produce_rbc }}
+                    <label class="form-check-label fw-bold text-dark ms-2" for="id_produce_rbc">
+                      <i class="bi bi-circle-fill text-danger me-1"></i>Red Blood Cells (RBC)
+                    </label>
+                  </div>
+                  <div class="small text-muted ps-4">
+                    Shelf life: <strong>42 days</strong> from collection date (Expires: {{ unit.collection_date|date:"d M Y" }})
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="id_volume_rbc" class="form-label small fw-semibold">RBC Volume (mL)</label>
+                  <div class="input-group">
+                    {{ form.volume_rbc }}
+                    <span class="input-group-text">mL</span>
+                  </div>
+                  {% if form.volume_rbc.errors %}
+                    <div class="text-danger small mt-1">{{ form.volume_rbc.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Component 2: Platelets -->
+            <div class="border rounded p-3 mb-3 bg-light">
+              <div class="row align-items-center g-3">
+                <div class="col-md-6">
+                  <div class="form-check form-switch fs-5">
+                    {{ form.produce_platelets }}
+                    <label class="form-check-label fw-bold text-dark ms-2" for="id_produce_platelets">
+                      <i class="bi bi-circle-fill text-warning me-1"></i>Platelets (Concentrate)
+                    </label>
+                  </div>
+                  <div class="small text-muted ps-4">
+                    Shelf life: <strong>5 days</strong> from collection date (Expires: {{ unit.collection_date|date:"d M Y" }})
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="id_volume_platelets" class="form-label small fw-semibold">Platelets Volume (mL)</label>
+                  <div class="input-group">
+                    {{ form.volume_platelets }}
+                    <span class="input-group-text">mL</span>
+                  </div>
+                  {% if form.volume_platelets.errors %}
+                    <div class="text-danger small mt-1">{{ form.volume_platelets.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Component 3: Fresh Frozen Plasma -->
+            <div class="border rounded p-3 mb-3 bg-light">
+              <div class="row align-items-center g-3">
+                <div class="col-md-6">
+                  <div class="form-check form-switch fs-5">
+                    {{ form.produce_plasma }}
+                    <label class="form-check-label fw-bold text-dark ms-2" for="id_produce_plasma">
+                      <i class="bi bi-circle-fill text-info me-1"></i>Fresh Frozen Plasma (FFP)
+                    </label>
+                  </div>
+                  <div class="small text-muted ps-4">
+                    Shelf life: <strong>365 days</strong> from collection date (Expires: {{ unit.collection_date|date:"d M Y" }})
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="id_volume_plasma" class="form-label small fw-semibold">Plasma Volume (mL)</label>
+                  <div class="input-group">
+                    {{ form.volume_plasma }}
+                    <span class="input-group-text">mL</span>
+                  </div>
+                  {% if form.volume_plasma.errors %}
+                    <div class="text-danger small mt-1">{{ form.volume_plasma.errors|striptags }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Staff Notes -->
+            <div class="mb-4">
+              <label for="id_separation_notes" class="form-label fw-semibold">
+                Separation Notes / Centrifugation Batch Record
+              </label>
+              {{ form.notes }}
+              <div class="form-text small">{{ form.notes.help_text }}</div>
+              {% if form.notes.errors %}
+                <div class="text-danger small mt-1">{{ form.notes.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Form Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+              <a href="{% url 'inventory:unit_detail' unit.bag_id %}" class="btn btn-outline-secondary px-4 py-2">
+                Cancel
+              </a>
+              <button type="submit" class="btn btn-primary px-4 py-2" onclick="return confirm('Confirm component separation? This will mark the parent Whole Blood unit as Separated and create traceable child units.');">
+                <i class="bi bi-diagram-3-fill me-1"></i>Execute Component Separation
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

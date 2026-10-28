@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('inventory', '0005_bloodunit_inventory_b_status_58a815_idx_and_more'),
+        ('inventory', '0006_bloodunitstatus_separated'),
         ('requisitions', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

@@ -22,7 +22,7 @@ from core.constants import BloodGroup, VALID_BLOOD_GROUPS, validate_blood_group
 class BloodUnitStatus(models.TextChoices):
     """
     Lifecycle status values for a blood unit.
-    SRS BBMS-F-026, BBMS-F-027, BBMS-F-039, BBMS-F-054, BBMS-F-057.
+    SRS BBMS-F-026, BBMS-F-027, BBMS-F-031, BBMS-F-039, BBMS-F-054, BBMS-F-057.
     """
     QUARANTINED = 'Quarantined', 'Quarantined'
     AVAILABLE = 'Available', 'Available'
@@ -31,6 +31,7 @@ class BloodUnitStatus(models.TextChoices):
     DELIVERED = 'Delivered', 'Delivered'
     DISCARDED = 'Discarded', 'Discarded'
     EXPIRED = 'Expired', 'Expired'
+    SEPARATED = 'Separated', 'Separated'
 
 
 class ComponentType(models.TextChoices):
@@ -105,6 +106,10 @@ class BloodUnitQuerySet(models.QuerySet):
     def discarded(self):
         """Returns units that have been marked Discarded (BBMS-F-027)."""
         return self.filter(status=BloodUnitStatus.DISCARDED)
+
+    def separated(self):
+        """Returns units that have been separated into components (BBMS-F-031)."""
+        return self.filter(status=BloodUnitStatus.SEPARATED)
 
     def update(self, **kwargs):
         if 'status' in kwargs:
@@ -358,11 +363,41 @@ class BloodUnit(models.Model):
         return self.status == BloodUnitStatus.DISCARDED
 
     @property
+    def is_separated(self):
+        """Returns True if the blood unit has been separated into components (BBMS-F-031)."""
+        return self.status == BloodUnitStatus.SEPARATED
+
+    @property
     def is_expired(self):
         """Checks if current time has passed the unit's expiry date (SRS BBMS-F-039)."""
         if not self.expiry_date:
             return False
         return timezone.now() > self.expiry_date
+
+    @property
+    def can_be_separated(self):
+        """
+        Returns True if unit is eligible for component separation:
+        - Component type is Whole Blood
+        - Status is Available
+        - Has not expired
+        - Has passed all 4 mandatory serology tests
+        - Has not already been separated (no child components and status != SEPARATED)
+        SRS BBMS-F-031, BBMS-F-032.
+        """
+        if self.component_type != ComponentType.WHOLE_BLOOD:
+            return False
+        if self.status != BloodUnitStatus.AVAILABLE:
+            return False
+        if self.is_expired:
+            return False
+        if not self.has_passed_serology:
+            return False
+        if self.is_separated:
+            return False
+        if self.pk and self.child_components.exists():
+            return False
+        return True
 
     @property
     def has_passed_serology(self):
@@ -731,6 +766,164 @@ class BloodUnit(models.Model):
 
         # Save unit without modifying donor's self-reported blood group
         self.save()
+
+    @transaction.atomic
+    def separate_into_components(self, components_data=None, staff_user=None, notes=''):
+        """
+        Separates a safe Whole Blood unit into traceable components (RBC, Platelets, Plasma).
+        SRS References:
+        - BBMS-F-031: Staff separation interface and child unit generation.
+        - BBMS-F-032: Parent Bag ID preservation and component traceability.
+        - BBMS-F-037: Expiry calculation anchored to source collection date.
+        - BBMS-SR-003: Staff authorization check.
+
+        components_data: Optional list of dicts specifying components to produce.
+            Default (if None):
+            [
+                {'component_type': ComponentType.RBC, 'volume_ml': 250},
+                {'component_type': ComponentType.PLATELETS, 'volume_ml': 50},
+                {'component_type': ComponentType.PLASMA, 'volume_ml': 200},
+            ]
+        """
+        if staff_user is not None:
+            user_role = getattr(staff_user, 'role', None)
+            is_authorized = (
+                user_role in ('STAFF', 'ADMIN') or
+                getattr(staff_user, 'is_staff', False) or
+                getattr(staff_user, 'is_superuser', False)
+            )
+            if not is_authorized:
+                raise PermissionDenied(
+                    "Only authorized blood bank staff or administrators can perform component separation "
+                    "(SRS BBMS-F-031, BBMS-SR-003)."
+                )
+
+        if not self.pk:
+            raise ValidationError("Unit must be saved before component separation can occur.")
+
+        parent = type(self).objects.select_for_update().get(pk=self.pk)
+        parent.refresh_from_db()
+
+        if parent.component_type != ComponentType.WHOLE_BLOOD:
+            raise ValidationError(
+                f"Only Whole Blood units can be separated into components. "
+                f"Current type: '{parent.component_type}' (SRS BBMS-F-031)."
+            )
+
+        if parent.status == BloodUnitStatus.SEPARATED or parent.child_components.exists():
+            raise ValidationError("This unit has already been separated into components (SRS BBMS-F-031).")
+
+        if parent.status != BloodUnitStatus.AVAILABLE:
+            raise ValidationError(
+                f"Only Available blood units can be separated into components. "
+                f"Current status: '{parent.status}' (SRS BBMS-F-031)."
+            )
+
+        if parent.is_expired:
+            raise ValidationError(
+                "Expired blood units cannot be separated into components (SRS BBMS-F-037)."
+            )
+
+        if not parent.has_passed_serology:
+            raise ValidationError(
+                "Unit must have passed all 4 mandatory serology tests (HIV, Hepatitis B, Hepatitis C, Syphilis) "
+                "before component separation (SRS BBMS-F-024, BBMS-F-031)."
+            )
+
+        if components_data is None:
+            components_data = [
+                {'component_type': ComponentType.RBC, 'volume_ml': 250},
+                {'component_type': ComponentType.PLATELETS, 'volume_ml': 50},
+                {'component_type': ComponentType.PLASMA, 'volume_ml': 200},
+            ]
+
+        if not components_data:
+            raise ValidationError("At least one component must be specified for separation (SRS BBMS-F-031).")
+
+        allowed_child_types = {
+            ComponentType.RBC,
+            ComponentType.PLATELETS,
+            ComponentType.PLASMA,
+        }
+
+        validated_specs = []
+        seen_types = set()
+        for item in components_data:
+            c_type = item.get('component_type')
+            if not c_type or c_type not in allowed_child_types:
+                raise ValidationError(
+                    f"Invalid child component type '{c_type}'. Allowed types: "
+                    f"{', '.join(sorted(allowed_child_types))} (SRS BBMS-F-031)."
+                )
+            if c_type in seen_types:
+                raise ValidationError(
+                    f"Duplicate component type '{c_type}' specified in separation request."
+                )
+            seen_types.add(c_type)
+
+            vol = item.get('volume_ml')
+            if vol is None or vol <= 0:
+                raise ValidationError(f"Volume for {c_type} must be greater than 0 mL.")
+            validated_specs.append((c_type, vol))
+
+        created_children = []
+        now = timezone.now()
+
+        for c_type, vol in validated_specs:
+            child_bag_id = type(self).generate_unique_bag_id()
+            shelf_days = COMPONENT_SHELF_LIFE_DAYS.get(c_type, 42)
+            child_expiry = parent.collection_date + timedelta(days=shelf_days)
+
+            if child_expiry <= now:
+                child_status = BloodUnitStatus.EXPIRED
+            else:
+                child_status = BloodUnitStatus.AVAILABLE
+
+            child = type(self)(
+                bag_id=child_bag_id,
+                parent_unit=parent,
+                donor=parent.donor,
+                blood_group=parent.blood_group,
+                component_type=c_type,
+                volume_ml=vol,
+                collection_date=parent.collection_date,
+                expiry_date=child_expiry,
+                status=child_status,
+                location=parent.location,
+                collected_by=parent.collected_by,
+                lab_confirmed_by=parent.lab_confirmed_by,
+                lab_confirmed_at=parent.lab_confirmed_at,
+                blood_group_notes=(
+                    f"Inherited confirmed blood group {parent.blood_group} from parent {parent.bag_id}."
+                ),
+                collection_notes=f"Separated from parent unit {parent.bag_id}. {notes}".strip(),
+            )
+            child.save(
+                actor=staff_user,
+                status_reason=f"Derived component from parent unit {parent.bag_id}."
+            )
+
+            for p_test in parent.serology_tests.all():
+                SerologyTest.objects.create(
+                    blood_unit=child,
+                    test_type=p_test.test_type,
+                    result=p_test.result,
+                    tested_by=p_test.tested_by,
+                    tested_at=p_test.tested_at,
+                    notes=f"Inherited from parent unit {parent.bag_id} (test #{p_test.pk}). {p_test.notes}".strip(),
+                )
+
+            created_children.append(child)
+
+        parent.status = BloodUnitStatus.SEPARATED
+        child_ids_str = ', '.join(c.bag_id for c in created_children)
+        parent_reason = f"Separated into {len(created_children)} child component(s): {child_ids_str}."
+        if notes:
+            parent_reason += f" Staff notes: {notes}"
+
+        parent.save(actor=staff_user, status_reason=parent_reason)
+        self.refresh_from_db()
+        return created_children
 
     def __str__(self):
         bg = self.blood_group or "Pending"

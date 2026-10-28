@@ -26,6 +26,7 @@ from .forms import (
     AllocationForm,
     BloodCollectionForm,
     BloodGroupCorrectionForm,
+    ComponentSeparationForm,
     DispatchForm,
     InventoryFilterForm,
     SerologyPanelForm,
@@ -51,6 +52,7 @@ from .services import (
     get_available_units_for_requisition,
     get_fefo_allocation_suggestions,
     get_inventory_counts,
+    process_expired_units,
 )
 
 
@@ -916,4 +918,192 @@ def api_manifest_detail(request, manifest_id):
     }, status=200)
 
 
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["GET", "POST"])
+def separate_blood_unit(request, bag_id):
+    """
+    Staff interface to separate a safe Whole Blood unit into traceable components
+    (RBC, Platelets, Plasma).
+    SRS References:
+    - Section 4.10 (BBMS-F-031, BBMS-F-032): Component Separation & Traceability
+    - Section 4.12 (BBMS-F-037): Component Expiry Calculation
+    """
+    unit = get_object_or_404(
+        BloodUnit.objects.select_related('donor', 'lab_confirmed_by', 'collected_by')
+        .prefetch_related('serology_tests', 'child_components'),
+        bag_id=bag_id
+    )
 
+    # 1. API / JSON Request handling
+    if _is_api_request(request) or request.content_type == 'application/json':
+        if request.method != 'POST':
+            return JsonResponse({'error': 'POST method required for separation.'}, status=405)
+
+        try:
+            body = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
+
+        components_data = body.get('components')
+        notes = body.get('notes', '')
+
+        try:
+            children = unit.separate_into_components(
+                components_data=components_data,
+                staff_user=request.user,
+                notes=notes
+            )
+        except ValidationError as exc:
+            return JsonResponse({'error': str(exc.message if hasattr(exc, 'message') else exc)}, status=400)
+        except Exception as exc:
+            return JsonResponse({'error': str(exc)}, status=400)
+
+        child_list = []
+        for child in children:
+            child_list.append({
+                'bag_id': child.bag_id,
+                'component_type': child.component_type,
+                'volume_ml': child.volume_ml,
+                'blood_group': child.blood_group,
+                'expiry_date': child.expiry_date.isoformat() if child.expiry_date else None,
+                'status': child.status,
+                'parent_bag_id': unit.bag_id,
+            })
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f"Whole blood unit {unit.bag_id} successfully separated into "
+                f"{len(children)} component(s)."
+            ),
+            'parent_bag_id': unit.bag_id,
+            'parent_status': unit.status,
+            'components': child_list,
+        }, status=201)
+
+    # 2. HTML Form GET
+    if request.method == 'GET':
+        if not unit.can_be_separated:
+            reasons = []
+            if unit.component_type != ComponentType.WHOLE_BLOOD:
+                reasons.append(f"unit is '{unit.component_type}', not Whole Blood")
+            if unit.status != BloodUnitStatus.AVAILABLE:
+                reasons.append(f"unit status is '{unit.status}' (must be Available)")
+            if unit.is_expired:
+                reasons.append("unit is expired")
+            if not unit.has_passed_serology:
+                reasons.append("unit has not passed all 4 mandatory serology tests")
+            if unit.is_separated or unit.child_components.exists():
+                reasons.append("unit has already been separated")
+
+            err_msg = f"Unit {unit.bag_id} is not eligible for component separation: {', '.join(reasons)}."
+            messages.warning(request, err_msg)
+            return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+
+        form = ComponentSeparationForm()
+        context = {
+            'title': f"Component Separation - {unit.bag_id}",
+            'unit': unit,
+            'form': form,
+        }
+        return render(request, 'inventory/separate_unit.html', context)
+
+    # 3. HTML Form POST
+    form = ComponentSeparationForm(request.POST)
+    if form.is_valid():
+        try:
+            components_data = form.get_components_data()
+            notes = form.cleaned_data.get('notes', '')
+            children = unit.separate_into_components(
+                components_data=components_data,
+                staff_user=request.user,
+                notes=notes
+            )
+            child_ids = ', '.join(c.bag_id for c in children)
+            messages.success(
+                request,
+                f"Unit {unit.bag_id} successfully separated into {len(children)} child component(s): {child_ids}. "
+                f"The parent unit is now marked 'Separated' and retired from allocatable stock (SRS BBMS-F-031)."
+            )
+            return redirect('inventory:unit_detail', bag_id=unit.bag_id)
+        except ValidationError as exc:
+            messages.error(request, str(exc.message if hasattr(exc, 'message') else exc))
+        except Exception as exc:
+            messages.error(request, f"Separation error: {exc}")
+
+    context = {
+        'title': f"Component Separation - {unit.bag_id}",
+        'unit': unit,
+        'form': form,
+    }
+    return render(request, 'inventory/separate_unit.html', context)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["POST"])
+def api_separate_blood_unit(request, bag_id):
+    """
+    Dedicated REST API endpoint for component separation.
+    SAD Section 4.3: POST /api/blood-units/{bagId}/components (Staff role)
+    SRS BBMS-F-031, BBMS-F-032, BBMS-SR-003.
+    """
+    return separate_blood_unit(request, bag_id)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["POST"])
+def api_expire_units(request):
+    """
+    REST API endpoint to trigger automatic inventory expiry processing.
+    SRS BBMS-F-037, BBMS-F-038, BBMS-F-039.
+    """
+    dry_run = False
+    as_of = None
+
+    if request.body:
+        try:
+            body = json.loads(request.body.decode('utf-8'))
+            dry_run = bool(body.get('dry_run', False))
+            as_of_raw = body.get('as_of')
+            if as_of_raw:
+                parsed = timezone.datetime.fromisoformat(as_of_raw.replace('Z', '+00:00'))
+                if timezone.is_naive(parsed):
+                    as_of = timezone.make_aware(parsed, timezone.get_current_timezone())
+                else:
+                    as_of = parsed
+        except Exception as exc:
+            return JsonResponse({'error': f"Invalid request body: {exc}"}, status=400)
+    else:
+        dry_run = request.POST.get('dry_run', '').lower() in ('1', 'true')
+        as_of_raw = request.POST.get('as_of')
+        if as_of_raw:
+            try:
+                parsed = timezone.datetime.fromisoformat(as_of_raw.replace('Z', '+00:00'))
+                as_of = (
+                    timezone.make_aware(parsed, timezone.get_current_timezone())
+                    if timezone.is_naive(parsed) else parsed
+                )
+            except Exception as exc:
+                return JsonResponse({'error': f"Invalid as_of value: {exc}"}, status=400)
+
+    result = process_expired_units(as_of=as_of, dry_run=dry_run, actor=request.user)
+
+    formatted_units = []
+    for item in result['expired_units']:
+        formatted_units.append({
+            'bag_id': item['bag_id'],
+            'previous_status': item['previous_status'],
+            'new_status': item['new_status'],
+            'blood_group': item['blood_group'],
+            'component_type': item['component_type'],
+            'expiry_date': item['expiry_date'].isoformat() if item['expiry_date'] else None,
+            'reason': item['reason'],
+        })
+
+    return JsonResponse({
+        'success': True,
+        'processed_count': result['processed_count'],
+        'expired_units': formatted_units,
+        'as_of': result['as_of'].isoformat(),
+        'dry_run': result['dry_run'],
+    }, status=200)

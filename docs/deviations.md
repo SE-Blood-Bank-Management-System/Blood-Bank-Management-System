@@ -184,7 +184,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: Medium
 - **Description**: Authorized staff need a dedicated Web UI to split a Whole Blood unit into RBC, Platelets, and Fresh Frozen Plasma. Each derived unit must inherit serology clearance from the parent unit, generate its own distinct Bag ID, and maintain a `parent_unit` reference for complete traceability.
 - **Sprint 1 Baseline**: Database foreign key `parent_unit` and `ComponentType` choices are in place.
-- **Sprint 2 Target**: Implement `/inventory/blood-units/<bag_id>/separate/` view, component separation form, and unit hierarchy rendering.
+- **Sprint 2 Implementation (#35)**: Implemented `/inventory/blood-units/<bag_id>/separate/` staff interface, `ComponentSeparationForm`, `BloodUnit.separate_into_components` domain logic, `Separated` parent status transition, and child unit hierarchy rendering with source collection date expiry anchoring. Added automated expiry service and CLI command `expire_units`. See [component separation and expiry docs](component-separation-and-expiry.md).
 
 #### DEF-002: Hospital Blood Requisition & STAT Emergency Prioritization Queue (SRS BBMS-F-043 to BBMS-F-048)
 - **Assigned Owner**: Abhinav K (PES1UG24CS701)

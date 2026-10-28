@@ -39,6 +39,16 @@ urlpatterns = [
         inventory_views.api_record_serology,
         name='api_blood_unit_serology'
     ),
+    path(
+        'api/blood-units/<str:bag_id>/components/',
+        inventory_views.api_separate_blood_unit,
+        name='api_blood_unit_components'
+    ),
+    path(
+        'api/inventory/expire/',
+        inventory_views.api_expire_units,
+        name='api_root_inventory_expire'
+    ),
 
     path(
         'api/appointments/slots/',
