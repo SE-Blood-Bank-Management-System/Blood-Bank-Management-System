@@ -320,4 +320,81 @@ class InventoryFilterForm(forms.Form):
         self.fields['location'].choices = loc_choices
 
 
+class AllocationForm(forms.Form):
+    """
+    Form for allocating selected blood units to an approved requisition.
+    Supports clinical override rationale when incompatible units are selected.
+    SRS BBMS-F-050, BBMS-F-052.
+    """
+    unit_ids = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=True,
+        help_text='Comma-separated primary keys of blood units to allocate'
+    )
+    override_reason = forms.CharField(
+        required=False,
+        label="Clinical Override Justification",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': (
+                'Mandatory only if selecting incompatible units. Provide authorized clinical '
+                'justification (e.g., emergency STAT cross-match exception approved by hematologist).'
+            ),
+            'id': 'id_override_reason',
+        }),
+        help_text='Required only when allocating an incompatible ABO/Rh unit (SRS BBMS-F-050).'
+    )
+
+    def clean_unit_ids(self):
+        val = self.cleaned_data.get('unit_ids', '')
+        if isinstance(val, list):
+            raw_ids = val
+        else:
+            raw_ids = [s.strip() for s in str(val).split(',') if s.strip()]
+        if not raw_ids:
+            raise forms.ValidationError('At least one blood unit must be selected.')
+        try:
+            return [int(pk) for pk in raw_ids]
+        except ValueError:
+            raise forms.ValidationError('Invalid blood unit identifiers.')
+
+
+class DispatchForm(forms.Form):
+    """
+    Form for dispatching reserved units against an approved requisition.
+    SRS BBMS-F-053, BBMS-F-054.
+    """
+    unit_ids = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=True,
+        help_text='Comma-separated primary keys of reserved blood units to dispatch'
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Dispatch Notes / Transportation Details",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Optional transport temperature, courier identity, or special handling notes.',
+            'id': 'id_dispatch_notes',
+        }),
+        help_text='Recorded on the formal dispatch manifest (SRS BBMS-F-053).'
+    )
+
+    def clean_unit_ids(self):
+        val = self.cleaned_data.get('unit_ids', '')
+        if isinstance(val, list):
+            raw_ids = val
+        else:
+            raw_ids = [s.strip() for s in str(val).split(',') if s.strip()]
+        if not raw_ids:
+            raise forms.ValidationError('At least one reserved blood unit must be selected.')
+        try:
+            return [int(pk) for pk in raw_ids]
+        except ValueError:
+            raise forms.ValidationError('Invalid blood unit identifiers.')
+
+
+
 
