@@ -9,13 +9,18 @@
     <div>
       <div class="d-flex align-items-center gap-2 mb-1">
         <h2 class="fw-bold mb-0"><i class="bi bi-droplet-half text-danger me-2"></i>Unit {{ unit.bag_id }}</h2>
-        <span class="badge {% if unit.status == 'Available' %}bg-success{% elif unit.status == 'Quarantined' %}bg-warning text-dark{% elif unit.status == 'Discarded' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+        <span class="badge {% if unit.status == 'Available' %}bg-success{% elif unit.status == 'Quarantined' %}bg-warning text-dark{% elif unit.status == 'Discarded' %}bg-danger{% elif unit.status == 'Separated' %}bg-info text-dark{% elif unit.status == 'Expired' %}bg-secondary{% else %}bg-secondary{% endif %} fs-6">
           {{ unit.status }}
         </span>
       </div>
       <p class="text-muted mb-0">ABO/Rh Blood Group Verification &amp; Laboratory Audit (SRS BBMS-F-020–F-023)</p>
     </div>
     <div class="d-flex gap-2">
+      {% if unit.can_be_separated %}
+        <a href="{% url 'inventory:separate_unit' unit.bag_id %}" class="btn btn-primary">
+          <i class="bi bi-diagram-3 me-1"></i>Separate Components
+        </a>
+      {% endif %}
       <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Back to Inventory
       </a>
@@ -173,6 +178,70 @@
     </div>
   </div>
 
+  {% if unit.child_components.exists %}
+    <!-- Derived Child Components & Traceability Lineage Card (SRS BBMS-F-031, BBMS-F-032) -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="fw-bold mb-0 text-primary">
+            <i class="bi bi-diagram-3 me-2"></i>Derived Child Components &amp; Lineage Traceability
+          </h5>
+          <small class="text-muted">SRS BBMS-F-031, BBMS-F-032: Components derived from parent unit {{ unit.bag_id }}</small>
+        </div>
+        <span class="badge bg-light text-primary border">{{ unit.child_components.count }} Component(s)</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Child Bag ID</th>
+                <th>Component</th>
+                <th>Blood Group</th>
+                <th>Volume</th>
+                <th>Collection Date</th>
+                <th>Expiry Date</th>
+                <th>Status</th>
+                <th class="text-end pe-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for child in unit.child_components.all %}
+                <tr>
+                  <td class="fw-bold font-monospace">
+                    <a href="{% url 'inventory:unit_detail' child.bag_id %}" class="text-decoration-none">
+                      {{ child.bag_id }}
+                    </a>
+                  </td>
+                  <td>{{ child.component_type }}</td>
+                  <td><span class="badge bg-danger">{{ child.blood_group }}</span></td>
+                  <td>{{ child.volume_ml }} mL</td>
+                  <td>{{ child.collection_date|date:"d M Y" }}</td>
+                  <td>
+                    {{ child.expiry_date|date:"d M Y, H:i" }}
+                    {% if child.is_expired %}
+                      <span class="badge bg-danger ms-1">Expired</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge {% if child.status == 'Available' %}bg-success{% elif child.status == 'Expired' %}bg-secondary{% elif child.status == 'Quarantined' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                      {{ child.status }}
+                    </span>
+                  </td>
+                  <td class="text-end pe-3">
+                    <a href="{% url 'inventory:unit_detail' child.bag_id %}" class="btn btn-sm btn-outline-primary">
+                      View Unit
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Serology Testing & Quarantine Controls Card (SRS BBMS-F-024 to BBMS-F-027, BBMS-F-029, BBMS-F-037) -->
   <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -213,6 +282,21 @@
           <div>
             <strong>Discarded / Unsafe Unit (BBMS-F-027):</strong> One or more serology tests yielded a reactive (Fail) result.
             This unit is strictly excluded from inventory availability, hospital search, and allocation (SRS BBMS-F-028).
+          </div>
+        </div>
+      {% elif unit.status == 'Separated' %}
+        <div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="alert">
+          <i class="bi bi-diagram-3-fill fs-4 text-info"></i>
+          <div>
+            <strong>Separated Unit (BBMS-F-031):</strong> This Whole Blood unit has been separated into traceable child components.
+            To prevent double counting, this parent unit is excluded from allocatable stock. Derived child components retain full lineage back to this unit.
+          </div>
+        </div>
+      {% elif unit.status == 'Expired' %}
+        <div class="alert alert-secondary d-flex align-items-center gap-2 mb-4" role="alert">
+          <i class="bi bi-clock-history fs-4"></i>
+          <div>
+            <strong>Expired Unit (BBMS-F-039):</strong> This unit has passed its shelf life and is retired from available stock.
           </div>
         </div>
       {% endif %}

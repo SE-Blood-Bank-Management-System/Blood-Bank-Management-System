@@ -320,4 +320,135 @@ class InventoryFilterForm(forms.Form):
         self.fields['location'].choices = loc_choices
 
 
+class ComponentSeparationForm(forms.Form):
+    """
+    Form enabling authorized staff to separate a Whole Blood unit into traceable
+    components (RBC, Platelets, Plasma).
+    SRS BBMS-F-031, BBMS-F-032.
+    """
+    produce_rbc = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Red Blood Cells (RBC)",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_produce_rbc',
+        }),
+        help_text="Standard packed red cells, shelf life 42 days (SRS BBMS-F-037)."
+    )
+    volume_rbc = forms.IntegerField(
+        required=False,
+        initial=250,
+        min_value=50,
+        max_value=400,
+        label="RBC Volume (mL)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'id': 'id_volume_rbc',
+            'step': '5',
+        }),
+    )
+
+    produce_platelets = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Platelets (Random Donor / Concentrate)",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_produce_platelets',
+        }),
+        help_text="Platelet concentrate, shelf life 5 days (SRS BBMS-F-037)."
+    )
+    volume_platelets = forms.IntegerField(
+        required=False,
+        initial=50,
+        min_value=20,
+        max_value=150,
+        label="Platelets Volume (mL)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'id': 'id_volume_platelets',
+            'step': '5',
+        }),
+    )
+
+    produce_plasma = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Fresh Frozen Plasma (FFP)",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_produce_plasma',
+        }),
+        help_text="Fresh frozen plasma, shelf life 365 days (SRS BBMS-F-037)."
+    )
+    volume_plasma = forms.IntegerField(
+        required=False,
+        initial=200,
+        min_value=50,
+        max_value=350,
+        label="Plasma Volume (mL)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'id': 'id_volume_plasma',
+            'step': '5',
+        }),
+    )
+
+    notes = forms.CharField(
+        required=False,
+        label="Separation Notes / Centrifuge Batch",
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': 'Optional centrifuge run parameters, operator notes, or comments.',
+            'id': 'id_separation_notes',
+        }),
+        help_text="Recorded in component traceability audit logs (SRS BBMS-F-032)."
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        produce_rbc = cleaned_data.get('produce_rbc')
+        produce_platelets = cleaned_data.get('produce_platelets')
+        produce_plasma = cleaned_data.get('produce_plasma')
+
+        if not (produce_rbc or produce_platelets or produce_plasma):
+            raise forms.ValidationError(
+                "At least one blood component must be selected for separation (SRS BBMS-F-031)."
+            )
+
+        if produce_rbc and not cleaned_data.get('volume_rbc'):
+            self.add_error('volume_rbc', "Volume is required for Red Blood Cells.")
+        if produce_platelets and not cleaned_data.get('volume_platelets'):
+            self.add_error('volume_platelets', "Volume is required for Platelets.")
+        if produce_plasma and not cleaned_data.get('volume_plasma'):
+            self.add_error('volume_plasma', "Volume is required for Fresh Frozen Plasma.")
+
+        return cleaned_data
+
+    def get_components_data(self):
+        """
+        Returns structured list of component specifications for BloodUnit.separate_into_components().
+        """
+        specs = []
+        if self.cleaned_data.get('produce_rbc'):
+            specs.append({
+                'component_type': ComponentType.RBC,
+                'volume_ml': self.cleaned_data['volume_rbc'],
+            })
+        if self.cleaned_data.get('produce_platelets'):
+            specs.append({
+                'component_type': ComponentType.PLATELETS,
+                'volume_ml': self.cleaned_data['volume_platelets'],
+            })
+        if self.cleaned_data.get('produce_plasma'):
+            specs.append({
+                'component_type': ComponentType.PLASMA,
+                'volume_ml': self.cleaned_data['volume_plasma'],
+            })
+        return specs
+
+
+
 
