@@ -64,6 +64,7 @@ class RequisitionViewTests(RequestTestCase):
         self.assertLess(response.content.index(urgent.requisition_id.encode()),
                         response.content.index(ordinary.requisition_id.encode()))
         self.assertContains(response, 'requisition-alerts.js')
+        self.assertContains(response, 'class="alert alert-danger alert-permanent mt-3"')
         url = reverse('requisitions:review', args=[urgent.pk])
         invalid = self.client.post(url, {'action': 'reject', 'version': 0}, secure=True)
         self.assertEqual(invalid.status_code, 400)

@@ -37,7 +37,7 @@
   {% if user.is_authenticated %}
     {% if user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
       <div class="container">
-        <div id="stat-request-alert" class="alert alert-danger mt-3" role="status" aria-live="polite"
+        <div id="stat-request-alert" class="alert alert-danger alert-permanent mt-3" role="status" aria-live="polite"
              data-endpoint="{% url 'requisitions:stat_alerts' %}" hidden>
           <span data-stat-message></span>
           <a class="alert-link ms-2" href="{% url 'requisitions:list' %}">Open review queue</a>
