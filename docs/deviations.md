@@ -198,8 +198,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: High
 - **Description**: Requisition fulfillment requires determining compatibility before unit allocation. Incompatible units must be blocked from allocation unless an authorized staff member provides an explicit clinical override justification.
 - **Sprint 1 Baseline**: Red blood cell compatibility matrix is defined in `core.constants.RBC_COMPATIBILITY_RULES` and `is_blood_compatible()`.
-- **Sprint 2 Target**: Wire compatibility rules into allocation UI with mandatory override text input when incompatible blood is chosen.
-- **Status in Sprint 2 (Issue #37)**: **Resolved & Verified**. Compatibility rules integrated into `allocate_units_to_requisition` and UI; overrides require mandatory justification and are logged with `CrossMatchOutcome.OVERRIDDEN` (verified by `TC-MATCH-01`).
+- **Sprint 2 Implementation (#36 & #37)**: Added component-specific transfusion compatibility policy service (`requisitions/compatibility.py`) covering RBC, Whole Blood, Fresh Frozen Plasma, and Platelets. Implemented `CrossMatchDecision(AppendOnlyModel)`, `record_cross_match()` with mandatory override justification enforcement, FEFO compatible inventory suggestions, requisition detail cross-matching interface, and `POST /api/requests/{id}/cross-match` REST API (see [compatibility and cross-matching documentation](compatibility-and-cross-matching.md)). Compatibility rules are integrated into `allocate_units_to_requisition` and UI where incompatible blood selection requires mandatory clinical justification logged as `CrossMatchOutcome.OVERRIDDEN` (verified by `TC-MATCH-01`).
 
 #### DEF-004: FEFO Unit Allocation & Stock Auto-Decrement (SRS BBMS-F-035, BBMS-F-038, BBMS-F-052 to BBMS-F-055)
 - **Assigned Owner**: Akshay Arcot (PES1UG24CS705)

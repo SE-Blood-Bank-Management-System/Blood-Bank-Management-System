@@ -102,12 +102,22 @@ class AppendOnlyModel(models.Model):
         raise ValidationError('Requisition history cannot be deleted.')
 
 
+class CrossMatchOutcome(models.TextChoices):
+    """
+    Cross-matching outcome classifications (SRS BBMS-F-051).
+    """
+    COMPATIBLE = 'Compatible', 'Compatible'
+    INCOMPATIBLE = 'Incompatible', 'Incompatible'
+    OVERRIDDEN = 'Overridden', 'Overridden'
+
+
 class RequisitionEvent(AppendOnlyModel):
     class Action(models.TextChoices):
         SUBMITTED = 'Submitted', 'Submitted'
         APPROVED = 'Approved', 'Approved'
         REJECTED = 'Rejected', 'Rejected'
         PRIORITY_CHANGED = 'Priority changed', 'Priority changed'
+        CROSS_MATCH_RECORDED = 'Cross-match recorded', 'Cross-match recorded'
         DISPATCH_RECORDED = 'Dispatch recorded', 'Dispatch recorded'
 
     requisition = models.ForeignKey(Requisition, on_delete=models.PROTECT, related_name='events')
@@ -134,3 +144,58 @@ class RequisitionFulfilment(AppendOnlyModel):
 
     class Meta:
         ordering = ['recorded_at', 'pk']
+
+
+class CrossMatchDecision(AppendOnlyModel):
+    """
+    Append-only record of a cross-matching determination and staff override.
+    SRS References:
+    - BBMS-F-049: ABO/Rh transfusion compatibility determination.
+    - BBMS-F-050: Incompatible allocation blocked unless explicit authorized override recorded.
+    - BBMS-F-051: Cross-match outcome recorded (Compatible / Incompatible / Overridden).
+    - BBMS-SR-004, BBMS-SR-008: Non-repudiation and auditability.
+    """
+    requisition = models.ForeignKey(
+        Requisition, on_delete=models.PROTECT, related_name='cross_matches',
+        help_text='Associated hospital blood requisition (SRS BBMS-F-043).'
+    )
+    blood_unit = models.ForeignKey(
+        'inventory.BloodUnit', on_delete=models.PROTECT, related_name='cross_matches',
+        help_text='Evaluated blood inventory unit (SRS BBMS-F-020).'
+    )
+    requested_blood_group = models.CharField(max_length=5)
+    donor_blood_group = models.CharField(max_length=5)
+    component_type = models.CharField(max_length=30)
+    outcome = models.CharField(max_length=20, choices=CrossMatchOutcome.choices)
+    is_compatible = models.BooleanField(
+        help_text='Biological transfusion compatibility outcome based on standard rules.'
+    )
+    is_overridden = models.BooleanField(
+        default=False,
+        help_text='Whether an incompatible match was authorized via staff clinical override.'
+    )
+    override_reason = models.TextField(
+        blank=True,
+        help_text='Mandatory clinical rationale provided by staff when overriding incompatibility.'
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        help_text='Staff member who performed the cross-match and authorized override.'
+    )
+    performed_by_label = models.CharField(max_length=150)
+    explanation = models.TextField(
+        blank=True,
+        help_text='Clinical explanation of compatibility determination.'
+    )
+    performed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-performed_at', '-pk']
+        indexes = [
+            models.Index(fields=['requisition', 'performed_at']),
+            models.Index(fields=['blood_unit', 'performed_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.blood_unit.bag_id} -> {self.requisition.requisition_id}: {self.outcome}"
+

@@ -4,7 +4,7 @@
 <div class="container">
   <a href="{% url 'requisitions:list' %}" class="btn btn-link ps-0">Back to requisitions</a>
   <h1 class="h4 text-break">{{ requisition.requisition_id }}</h1>
-  {{ review_form.non_field_errors }}{{ priority_form.non_field_errors }}
+  {{ review_form.non_field_errors }}{{ priority_form.non_field_errors }}{{ cross_match_form.non_field_errors }}
   <div class="row g-4 mt-1">
     <div class="col-lg-7"><div class="card shadow-sm"><div class="card-body">
       <h2 class="h5">Request summary</h2>
@@ -37,30 +37,114 @@
         </form>
       {% endif %}
     </div></div></div>
-    {% endif %}
+    {% elif not is_hospital and requisition.status == 'Approved' or not is_hospital and requisition.status == 'Partially Fulfilled' %}
+    <div class="col-lg-5 d-flex flex-column gap-3">
+      <div class="card shadow-sm border-primary"><div class="card-body">
+        <h2 class="h5 text-primary">Fulfilment &amp; Stock Allocation</h2>
+        <p class="text-muted small mb-3">
+          Units reserved: <strong>{{ requisition.allocations.count }}</strong> |
+          Remaining needed: <strong>{{ requisition.remaining_quantity }}</strong>
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if requisition.remaining_quantity > 0 %}
+            <a href="{% url 'inventory:allocate_requisition' requisition.pk %}" class="btn btn-primary">
+              Allocate Units (FEFO)
+            </a>
+          {% endif %}
+          {% if requisition.allocations.all %}
+            <a href="{% url 'inventory:dispatch_requisition' requisition.pk %}" class="btn btn-success">
+              Dispatch Reserved Units
+            </a>
+          {% endif %}
+        </div>
+      </div></div>
 
-    {% if not is_hospital and requisition.status == 'Approved' or requisition.status == 'Partially Fulfilled' %}
-    <div class="col-lg-5"><div class="card shadow-sm border-primary"><div class="card-body">
-      <h2 class="h5 text-primary">Fulfilment & Stock Allocation</h2>
-      <p class="text-muted small mb-3">
-        Units reserved: <strong>{{ requisition.allocations.count }}</strong> |
-        Remaining needed: <strong>{{ requisition.remaining_quantity }}</strong>
-      </p>
-      <div class="d-flex flex-wrap gap-2">
-        {% if requisition.remaining_quantity > 0 %}
-          <a href="{% url 'inventory:allocate_requisition' requisition.pk %}" class="btn btn-primary">
-            Allocate Units (FEFO)
-          </a>
+      <div class="card shadow-sm"><div class="card-body">
+        <h2 class="h5 text-primary"><i class="bi bi-shield-check me-1"></i>Cross-Match &amp; Override</h2>
+        <p class="small text-muted mb-2">Check unit compatibility against requested <strong>{{ requisition.blood_group }} ({{ requisition.component_type }})</strong>. Incompatible units require an authorized clinical override (SRS BBMS-F-049–F-051).</p>
+        
+        <div class="p-2 bg-light rounded mb-3 small">
+          <strong>Compatible Groups:</strong>
+          <div class="d-flex flex-wrap gap-1 mt-1">
+            {% for bg in compatible_groups %}
+              <span class="badge bg-success">{{ bg }}</span>
+            {% empty %}
+              <span class="text-muted">No compatible groups defined.</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if cross_match_form.non_field_errors %}
+          <div class="alert alert-danger small py-2 mb-3">{{ cross_match_form.non_field_errors }}</div>
         {% endif %}
-        {% if requisition.allocations.all %}
-          <a href="{% url 'inventory:dispatch_requisition' requisition.pk %}" class="btn btn-success">
-            Dispatch Reserved Units
-          </a>
-        {% endif %}
-      </div>
-    </div></div></div>
+
+        <form method="post" action="{% url 'requisitions:cross_match' requisition.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label for="id_cross_match_bag_id" class="form-label small fw-semibold">Unit Bag ID</label>
+            {{ cross_match_form.bag_id }}
+            {% if cross_match_form.bag_id.errors %}
+              <div class="text-danger small mt-1">{{ cross_match_form.bag_id.errors|striptags }}</div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="id_override_reason" class="form-label small fw-semibold">Override Justification (if incompatible)</label>
+            {{ cross_match_form.override_reason }}
+            {% if cross_match_form.override_reason.errors %}
+              <div class="text-danger small mt-1">{{ cross_match_form.override_reason.errors|striptags }}</div>
+            {% endif %}
+            <div class="form-text small">{{ cross_match_form.override_reason.help_text }}</div>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Record Cross-Match</button>
+        </form>
+      </div></div>
+    </div>
     {% endif %}
   </div>
+
+  {% if not is_hospital and compatible_inventory %}
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+      <h2 class="h6 mb-0 text-dark">
+        <i class="bi bi-collection me-1 text-primary"></i>Available FEFO-Compatible Inventory ({{ compatible_inventory|length }} suggested)
+      </h2>
+      <small class="text-muted">First-Expiry-First-Out sequence (SRS BBMS-F-035, BBMS-F-049)</small>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Bag ID</th>
+            <th>Group</th>
+            <th>Component</th>
+            <th>Volume</th>
+            <th>Expiry Date</th>
+            <th>Facility</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for unit in compatible_inventory %}
+            <tr>
+              <td class="fw-bold font-monospace">{{ unit.bag_id }}</td>
+              <td><span class="badge bg-danger">{{ unit.blood_group }}</span></td>
+              <td>{{ unit.component_type }}</td>
+              <td>{{ unit.volume_ml }} mL</td>
+              <td>{{ unit.expiry_date|date:'d M Y H:i' }}</td>
+              <td>{{ unit.location }}</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                        onclick="document.getElementById('id_cross_match_bag_id').value='{{ unit.bag_id }}';">
+                  Select
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {% if requisition.allocations.exists %}
   <h2 class="h5 mt-4">Allocated / Reserved Blood Units</h2>
@@ -113,6 +197,56 @@
   </table></div>
   {% endif %}
 
+  {% if not is_hospital and cross_matches %}
+  <div class="card shadow-sm mt-4">
+    <div class="card-header bg-white py-2">
+      <h2 class="h6 mb-0 text-dark">
+        <i class="bi bi-clock-history me-1 text-secondary"></i>Cross-Matching &amp; Override Audit Trail (SRS BBMS-F-051)
+      </h2>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Timestamp</th>
+            <th>Unit Bag ID</th>
+            <th>Unit Group</th>
+            <th>Requested Group</th>
+            <th>Outcome</th>
+            <th>Staff Evaluator</th>
+            <th>Clinical Notes / Override Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for decision in cross_matches %}
+            <tr>
+              <td>{{ decision.performed_at|date:'d M Y H:i:s' }}</td>
+              <td class="fw-bold font-monospace">{{ decision.blood_unit.bag_id }}</td>
+              <td><span class="badge bg-danger">{{ decision.donor_blood_group }}</span></td>
+              <td><span class="badge bg-secondary">{{ decision.requested_blood_group }}</span></td>
+              <td>
+                {% if decision.outcome == 'Compatible' %}
+                  <span class="badge bg-success">Compatible</span>
+                {% elif decision.outcome == 'Overridden' %}
+                  <span class="badge bg-warning text-dark">Overridden</span>
+                {% else %}
+                  <span class="badge bg-danger">Incompatible</span>
+                {% endif %}
+              </td>
+              <td>{{ decision.performed_by_label }}</td>
+              <td>
+                <div class="small">{{ decision.explanation }}</div>
+                {% if decision.override_reason %}
+                  <div class="text-danger small mt-1"><strong>Override Reason:</strong> {{ decision.override_reason }}</div>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
   <h2 class="h5 mt-4">Request history</h2>
   <div class="table-responsive"><table class="table table-bordered bg-white">
     <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Status / priority</th><th scope="col">Note</th></tr></thead>

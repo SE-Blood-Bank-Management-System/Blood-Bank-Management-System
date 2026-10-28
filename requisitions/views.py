@@ -10,11 +10,20 @@ from django.views.decorators.http import require_http_methods, require_POST, req
 from accounts.models import User
 from accounts.rbac import role_required
 from .api import json_errors
-from .forms import PriorityForm, RequisitionForm, ReviewForm
+from .compatibility import get_compatible_donor_groups
+from .forms import CrossMatchForm, PriorityForm, RequisitionForm, ReviewForm
 from .models import Requisition
 from .services import (
-    RequisitionConflict, pending_stat_summary, require_hospital, require_staff,
-    review_requisition, set_priority, submit_requisition, visible_requisitions,
+    RequisitionConflict,
+    get_compatible_inventory_for_requisition,
+    pending_stat_summary,
+    record_cross_match,
+    require_hospital,
+    require_staff,
+    review_requisition,
+    set_priority,
+    submit_requisition,
+    visible_requisitions,
 )
 
 
@@ -64,10 +73,25 @@ def create(request):
 
 
 def _detail_context(request, requisition, **overrides):
-    return {'requisition': requisition, 'events': requisition.events.all(),
-            'review_form': ReviewForm(initial={'version': requisition.version}),
-            'priority_form': PriorityForm(initial={'version': requisition.version, 'is_stat': requisition.is_stat}),
-            'is_hospital': request.user.role == User.Role.HOSPITAL, **overrides}
+    context = {
+        'requisition': requisition,
+        'events': requisition.events.all(),
+        'review_form': ReviewForm(initial={'version': requisition.version}),
+        'priority_form': PriorityForm(initial={'version': requisition.version, 'is_stat': requisition.is_stat}),
+        'is_hospital': request.user.role == User.Role.HOSPITAL,
+    }
+
+    # Clinical cross-matching context for staff/admin (SRS BBMS-F-049 to BBMS-F-051)
+    if request.user.role in (User.Role.STAFF, User.Role.ADMIN):
+        context['compatible_groups'] = get_compatible_donor_groups(
+            requisition.blood_group, requisition.component_type
+        )
+        context['compatible_inventory'] = get_compatible_inventory_for_requisition(requisition)[:10]
+        context['cross_matches'] = requisition.cross_matches.select_related('blood_unit', 'performed_by').all()[:15]
+        context['cross_match_form'] = CrossMatchForm(initial={'version': requisition.version})
+
+    context.update(overrides)
+    return context
 
 
 @role_required(*ACCESS)
@@ -97,6 +121,55 @@ def review(request, pk):
             messages.success(request, 'Staff review recorded.')
             return redirect('requisitions:detail', pk=pk)
     return render(request, 'requisitions/detail.html', _detail_context(request, requisition, review_form=form), status=status)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_POST
+def cross_match(request, pk):
+    """
+    Staff action to record cross-matching and clinical override decisions.
+    SRS References:
+    - BBMS-F-049: Compatibility calculation.
+    - BBMS-F-050: Incompatible units blocked unless authorized override is supplied.
+    - BBMS-F-051: Cross-match outcome recorded against allocation.
+    """
+    require_staff(request.user)
+    requisition = get_object_or_404(visible_requisitions(request.user), pk=pk)
+    form = CrossMatchForm(request.POST)
+    status = 400
+    if form.is_valid():
+        try:
+            decision = record_cross_match(
+                requisition.pk,
+                form.cleaned_data['bag_id'],
+                actor=request.user,
+                override_reason=form.cleaned_data.get('override_reason', ''),
+                expected_version=form.cleaned_data.get('version')
+            )
+        except ValidationError as error:
+            _form_error(form, error)
+        else:
+            if decision.is_overridden:
+                messages.warning(
+                    request,
+                    f"Cross-match recorded with OVERRIDE: Unit {decision.blood_unit.bag_id} "
+                    f"({decision.donor_blood_group}) is biologically incompatible with request "
+                    f"({decision.requested_blood_group}), but clinical override was authorized (SRS BBMS-F-050)."
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Cross-match successful: Unit {decision.blood_unit.bag_id} ({decision.donor_blood_group}) "
+                    f"is COMPATIBLE with request ({decision.requested_blood_group}) (SRS BBMS-F-049)."
+                )
+            return redirect('requisitions:detail', pk=pk)
+
+    return render(
+        request, 'requisitions/detail.html',
+        _detail_context(request, requisition, cross_match_form=form),
+        status=status
+    )
 
 
 @role_required(User.Role.HOSPITAL)

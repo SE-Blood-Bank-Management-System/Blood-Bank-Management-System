@@ -45,3 +45,41 @@ class PriorityForm(forms.Form):
     is_stat = forms.BooleanField(required=False, label='Emergency / STAT',
                                  widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
     version = forms.IntegerField(min_value=0, widget=forms.HiddenInput)
+
+
+class CrossMatchForm(forms.Form):
+    """
+    Staff form to record cross-matching and clinical overrides (SRS BBMS-F-049, BBMS-F-050).
+    """
+    bag_id = forms.CharField(
+        max_length=32,
+        label='Unit Bag ID',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control font-monospace',
+            'placeholder': 'e.g. BAG-20261028-A1B2C3',
+            'id': 'id_cross_match_bag_id',
+        }),
+        help_text='Scan or enter the Bag ID of the candidate unit to cross-match (SRS BBMS-F-020, BBMS-F-049).'
+    )
+    override_reason = forms.CharField(
+        required=False,
+        label='Clinical Override Justification',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 2,
+            'placeholder': (
+                'Mandatory if unit is incompatible (e.g. Emergency extreme '
+                'uncrossmatched protocol, clinician authorization).'
+            ),
+            'id': 'id_override_reason',
+        }),
+        help_text='Required when cross-matching an incompatible blood unit (SRS BBMS-F-050).'
+    )
+    version = forms.IntegerField(min_value=0, widget=forms.HiddenInput, required=False)
+
+    def clean_bag_id(self):
+        bag_id = self.cleaned_data.get('bag_id', '').strip()
+        if not bag_id:
+            raise forms.ValidationError('Please provide a blood unit Bag ID.')
+        return bag_id
+

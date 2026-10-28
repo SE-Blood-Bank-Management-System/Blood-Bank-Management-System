@@ -9,4 +9,5 @@ urlpatterns = [
     path('<int:pk>/', api.detail, name='detail'),
     path('<int:pk>/priority/', api.priority, name='priority'),
     path('<int:pk>/review/', api.review, name='review'),
+    path('<int:pk>/cross-match/', api.cross_match, name='cross_match'),
 ]

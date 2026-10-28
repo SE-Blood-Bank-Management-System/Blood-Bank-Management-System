@@ -11,4 +11,5 @@ urlpatterns = [
     path('<int:pk>/', views.detail, name='detail'),
     path('<int:pk>/review/', views.review, name='review'),
     path('<int:pk>/priority/', views.priority, name='priority'),
+    path('<int:pk>/cross-match/', views.cross_match, name='cross_match'),
 ]

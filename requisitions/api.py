@@ -14,7 +14,13 @@ from accounts.rbac import role_required
 from .forms import RequisitionForm, ReviewForm
 from .models import Requisition
 from .services import (
-    RequisitionConflict, require_hospital, review_requisition, set_priority, submit_requisition, visible_requisitions,
+    RequisitionConflict,
+    record_cross_match,
+    require_hospital,
+    review_requisition,
+    set_priority,
+    submit_requisition,
+    visible_requisitions,
 )
 
 
@@ -143,3 +149,58 @@ def review(request, pk):
     result = review_requisition(requisition.pk, actor=request.user, action=form.cleaned_data['action'],
                                 reason=form.cleaned_data['reason'], expected_version=form.cleaned_data['version'])
     return JsonResponse(request_data(result))
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@never_cache
+@require_http_methods(['POST'])
+@json_errors
+def cross_match(request, pk):
+    """
+    SAD Section 4.3: POST /api/requests/{id}/cross-match
+    Compute compatibility / record cross-match and override decision (SRS BBMS-F-049 to BBMS-F-051).
+    """
+    requisition = get_object_or_404(visible_requisitions(request.user), pk=pk)
+    data = payload(request, ['bagId', 'unitId', 'overrideReason', 'notes', 'version'])
+
+    unit_id = data.get('bagId') or data.get('unitId')
+    if not unit_id:
+        raise PayloadError('Provide a bagId or unitId to cross-match.')
+
+    version = data.get('version')
+    if version is not None and (type(version) is not int or version < 0):
+        raise PayloadError('Provide a non-negative integer version.')
+
+    override_reason = data.get('overrideReason', '')
+    if not isinstance(override_reason, str):
+        raise PayloadError('overrideReason must be text.')
+
+    notes = data.get('notes', '')
+    if not isinstance(notes, str):
+        raise PayloadError('notes must be text.')
+
+    decision = record_cross_match(
+        requisition.pk,
+        unit_id,
+        actor=request.user,
+        override_reason=override_reason,
+        notes=notes,
+        expected_version=version
+    )
+
+    return JsonResponse({
+        'success': True,
+        'decisionId': decision.pk,
+        'requestId': requisition.requisition_id,
+        'bagId': decision.blood_unit.bag_id,
+        'requestedBloodGroup': decision.requested_blood_group,
+        'donorBloodGroup': decision.donor_blood_group,
+        'component': decision.component_type,
+        'outcome': decision.outcome,
+        'isCompatible': decision.is_compatible,
+        'isOverridden': decision.is_overridden,
+        'overrideReason': decision.override_reason,
+        'explanation': decision.explanation,
+        'performedBy': decision.performed_by_label,
+        'performedAt': decision.performed_at.isoformat(),
+    }, status=201 if decision.is_overridden else 200)
