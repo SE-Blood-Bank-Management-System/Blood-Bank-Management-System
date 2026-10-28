@@ -103,8 +103,18 @@
           {% elif user.role == 'HOSPITAL' %}
             {# Hospital User Navigation #}
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'core:public_availability' %}">
+              <a class="nav-link" href="{% url 'requisitions:list' %}">
                 <i class="bi bi-hospital me-1"></i>Hospital Portal
+              </a>
+            </li>
+          {% endif %}
+        {% endif %}
+
+        {% if user.is_authenticated %}
+          {% if user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'requisitions:list' %}">
+                <i class="bi bi-hospital me-1"></i>Requisition Queue
               </a>
             </li>
           {% endif %}

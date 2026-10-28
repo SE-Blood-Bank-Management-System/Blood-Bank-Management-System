@@ -44,12 +44,13 @@ INSTALLED_APPS = [
     'donors.apps.DonorsConfig',
     'appointments.apps.AppointmentsConfig',
     'inventory.apps.InventoryConfig',
+    'requisitions.apps.RequisitionsConfig',
     'core.apps.CoreConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
+    'requisitions.middleware.ActivitySessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
