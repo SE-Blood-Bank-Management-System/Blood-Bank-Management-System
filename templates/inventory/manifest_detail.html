@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Dispatch Manifest {{ manifest.manifest_id }} · BBMS{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'requisitions:list' %}">Requisitions</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'requisitions:detail' requisition.pk %}">{{ requisition.requisition_id }}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ manifest.manifest_id }}</li>
+      </ol>
+    </nav>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-dark" onclick="window.print()">
+        🖨️ Print Manifest
+      </button>
+      <a href="{% url 'requisitions:detail' requisition.pk %}" class="btn btn-primary">
+        Back to Requisition
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-dark">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+      <div>
+        <h1 class="h4 mb-0">BLOOD BANK DISPATCH MANIFEST</h1>
+        <small class="text-light">SRS Section 4.17 (BBMS-F-053, BBMS-F-054) · Chain of Custody Transfer</small>
+      </div>
+      <div class="text-end">
+        <span class="badge bg-light text-dark fs-6">{{ manifest.manifest_id }}</span>
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <div class="row mb-4 border-bottom pb-3">
+        <div class="col-md-6">
+          <h2 class="h6 text-muted text-uppercase mb-2">Hospital Consignee Details</h2>
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Hospital Name:</dt>
+            <dd class="col-sm-7 fw-bold">{{ requisition.hospital.hospital_name|default:requisition.hospital.username }}</dd>
+            <dt class="col-sm-5">License Number:</dt>
+            <dd class="col-sm-7">{{ requisition.hospital.hospital_license_number|default:'—' }}</dd>
+            <dt class="col-sm-5">Delivery Address:</dt>
+            <dd class="col-sm-7">{{ requisition.hospital.address|default:'—' }}</dd>
+            <dt class="col-sm-5">Contact Person:</dt>
+            <dd class="col-sm-7">{{ requisition.hospital.contact_person|default:'—' }} ({{ requisition.hospital.phone_number|default:'—' }})</dd>
+          </dl>
+        </div>
+        <div class="col-md-6">
+          <h2 class="h6 text-muted text-uppercase mb-2">Dispatch & Order Metadata</h2>
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Requisition ID:</dt>
+            <dd class="col-sm-7 fw-bold text-monospace">{{ requisition.requisition_id }}</dd>
+            <dt class="col-sm-5">Priority:</dt>
+            <dd class="col-sm-7">
+              {% if requisition.is_stat %}
+                <span class="badge bg-danger">Emergency / STAT</span>
+              {% else %}
+                <span class="badge bg-secondary">Routine</span>
+              {% endif %}
+            </dd>
+            <dt class="col-sm-5">Dispatch Timestamp:</dt>
+            <dd class="col-sm-7">{{ manifest.dispatched_at|date:'d M Y H:i:s T' }}</dd>
+            <dt class="col-sm-5">Dispatching Staff:</dt>
+            <dd class="col-sm-7 fw-bold">{{ manifest.dispatched_by.get_full_name|default:manifest.dispatched_by.username }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <h2 class="h5 mb-3">Dispatched Blood Units ({{ units|length }} Units)</h2>
+      <div class="table-responsive mb-4">
+        <table class="table table-bordered table-striped">
+          <thead class="table-dark">
+            <tr>
+              <th>#</th>
+              <th>Bag ID</th>
+              <th>Component Type</th>
+              <th>ABO/Rh Blood Group</th>
+              <th>Volume (mL)</th>
+              <th>Expiry Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for unit in units %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><strong>{{ unit.bag_id }}</strong></td>
+                <td>{{ unit.component_type }}</td>
+                <td><span class="badge bg-danger">{{ unit.blood_group }}</span></td>
+                <td>{{ unit.volume_ml }} mL</td>
+                <td><span class="fw-semibold">{{ unit.expiry_date|date:'d M Y' }}</span></td>
+                <td><span class="badge bg-success">Dispatched</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if manifest.notes %}
+        <div class="card bg-light mb-4 border">
+          <div class="card-body">
+            <h3 class="h6 fw-bold mb-1">Logistics / Courier Notes:</h3>
+            <p class="mb-0 text-muted">{{ manifest.notes }}</p>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="row pt-4 mt-4 border-top">
+        <div class="col-md-6">
+          <div class="border p-3 rounded" style="min-height: 120px;">
+            <p class="small text-muted mb-4">Dispatched by Authorized Blood Bank Staff:</p>
+            <div class="border-top pt-2">
+              <strong>Signature:</strong> _______________________<br>
+              <strong>Name:</strong> {{ manifest.dispatched_by.get_full_name|default:manifest.dispatched_by.username }}<br>
+              <strong>Date:</strong> {{ manifest.dispatched_at|date:'d M Y H:i' }}
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="border p-3 rounded" style="min-height: 120px;">
+            <p class="small text-muted mb-4">Received by Hospital Consignee (SRS BBMS-F-056):</p>
+            <div class="border-top pt-2">
+              <strong>Signature:</strong> _______________________<br>
+              <strong>Name:</strong> _______________________<br>
+              <strong>Date & Time:</strong> _______________________
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

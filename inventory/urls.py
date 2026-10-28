@@ -20,5 +20,33 @@ urlpatterns = [
     path('api/blood-units/<str:bag_id>/serology/', views.api_record_serology, name='api_record_serology'),
     path('api/blood-units/<str:bag_id>/components/', views.api_separate_blood_unit, name='api_separate_components'),
     path('api/expire/', views.api_expire_units, name='api_expire_units'),
+    # FEFO Allocation, Dispatch Manifests and Fulfilment (Issue #37)
+    path(
+        'requisitions/<int:requisition_pk>/allocate/',
+        views.allocate_requisition_view,
+        name='allocate_requisition'
+    ),
+    path(
+        'requisitions/<int:requisition_pk>/dispatch/',
+        views.dispatch_requisition_view,
+        name='dispatch_requisition'
+    ),
+    path('manifests/<str:manifest_id>/', views.manifest_detail_view, name='manifest_detail'),
+    path(
+        'api/requisitions/<int:requisition_pk>/suggestions/',
+        views.api_fefo_suggestions,
+        name='api_fefo_suggestions'
+    ),
+    path(
+        'api/requisitions/<int:requisition_pk>/allocate/',
+        views.api_allocate_units,
+        name='api_allocate_units'
+    ),
+    path(
+        'api/requisitions/<int:requisition_pk>/dispatch/',
+        views.api_dispatch_units,
+        name='api_dispatch_units'
+    ),
+    path('api/manifests/<str:manifest_id>/', views.api_manifest_detail, name='api_manifest_detail'),
 ]
 

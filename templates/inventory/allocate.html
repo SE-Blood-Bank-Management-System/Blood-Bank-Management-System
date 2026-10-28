@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% block title %}Allocate Units · Requisition {{ requisition.requisition_id }} · BBMS{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'requisitions:list' %}">Requisitions</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'requisitions:detail' requisition.pk %}">{{ requisition.requisition_id }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Allocate Units (FEFO)</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h1 class="h5 mb-0">FEFO Blood Unit Allocation (SRS BBMS-F-038, BBMS-F-052)</h1>
+      <span class="badge bg-light text-dark">{{ requisition.status }}</span>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-3">
+          <strong>Requisition ID:</strong><br>
+          <span class="text-monospace">{{ requisition.requisition_id }}</span>
+        </div>
+        <div class="col-md-3">
+          <strong>Hospital:</strong><br>
+          {{ requisition.hospital.hospital_name|default:requisition.hospital.username }}
+        </div>
+        <div class="col-md-3">
+          <strong>Requested Group / Component:</strong><br>
+          <span class="badge bg-danger">{{ requisition.blood_group }}</span> / {{ requisition.component_type }}
+        </div>
+        <div class="col-md-3">
+          <strong>Remaining Quantity Needed:</strong><br>
+          <span class="fs-5 fw-bold text-primary">{{ remaining_unreserved }}</span> unit(s)
+          <small class="text-muted d-block">({{ requisition.quantity }} requested, {{ requisition.dispatched_quantity }} dispatched, {{ current_reserved }} reserved)</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" id="allocation-form">
+    {% csrf_token %}
+    <input type="hidden" name="unit_ids" id="id_unit_ids" value="">
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <!-- FEFO Suggested Units Section -->
+    <div class="card shadow-sm mb-4 border-success">
+      <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">Recommended Stock (First-Expiry-First-Out / FEFO)</h2>
+        <span class="badge bg-light text-dark">{{ fefo_suggestions|length }} suggested</span>
+      </div>
+      <div class="card-body p-0">
+        {% if fefo_suggestions %}
+          <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 40px;">Select</th>
+                  <th>Bag ID</th>
+                  <th>Blood Group</th>
+                  <th>Component</th>
+                  <th>Expiry Date</th>
+                  <th>Collection Date</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for unit in fefo_suggestions %}
+                  <tr>
+                    <td>
+                      <input type="checkbox" class="unit-checkbox" value="{{ unit.id }}" data-bag-id="{{ unit.bag_id }}" data-compatible="true">
+                    </td>
+                    <td><strong>{{ unit.bag_id }}</strong></td>
+                    <td><span class="badge bg-danger">{{ unit.blood_group }}</span> <span class="badge bg-success">Compatible</span></td>
+                    <td>{{ unit.component_type }}</td>
+                    <td><span class="text-danger fw-semibold">{{ unit.expiry_date|date:'d M Y' }}</span></td>
+                    <td>{{ unit.collection_date|date:'d M Y' }}</td>
+                    <td>{{ unit.location }}</td>
+                    <td><span class="badge bg-info text-dark">Available</span></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No compatible unreserved units currently available in stock.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- All Available Stock Section (with ABO/Rh Compatibility Indicators) -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">All Available Stock for {{ requisition.component_type }}</h2>
+        <span class="badge bg-light text-dark">{{ available_units|length }} total</span>
+      </div>
+      <div class="card-body p-0">
+        {% if available_units %}
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-hover table-sm mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th style="width: 40px;">Select</th>
+                  <th>Bag ID</th>
+                  <th>Blood Group</th>
+                  <th>Compatibility</th>
+                  <th>Expiry Date</th>
+                  <th>Collection Date</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in available_units %}
+                  <tr class="{% if not item.is_compatible %}table-warning{% endif %}">
+                    <td>
+                      <input type="checkbox" class="unit-checkbox" value="{{ item.unit.id }}" data-bag-id="{{ item.unit.bag_id }}" data-compatible="{{ item.is_compatible|yesno:'true,false' }}">
+                    </td>
+                    <td>{{ item.unit.bag_id }}</td>
+                    <td><span class="badge bg-dark">{{ item.unit.blood_group }}</span></td>
+                    <td>
+                      {% if item.is_compatible %}
+                        <span class="badge bg-success">Compatible</span>
+                      {% else %}
+                        <span class="badge bg-warning text-dark">Incompatible (Requires Override)</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ item.unit.expiry_date|date:'d M Y' }}</td>
+                    <td>{{ item.unit.collection_date|date:'d M Y' }}</td>
+                    <td>{{ item.unit.location }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No units found.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Clinical Override Justification (SRS BBMS-F-050) -->
+    <div class="card shadow-sm mb-4 border-warning" id="override-card" style="display: none;">
+      <div class="card-header bg-warning text-dark">
+        <h3 class="h6 mb-0"><strong>⚠️ Transfusion Compatibility Clinical Override (SRS BBMS-F-050)</strong></h3>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">
+          One or more selected units are <strong>not ABO/Rh compatible</strong> with the requested blood group
+          (<strong>{{ requisition.blood_group }}</strong>). Transfusion protocol requires an authorized staff clinical justification before proceeding.
+        </p>
+        <div class="mb-3">
+          <label for="id_override_reason" class="form-label fw-bold">Clinical Override Justification <span class="text-danger">*</span></label>
+          {{ form.override_reason }}
+          {% if form.override_reason.errors %}
+            <div class="text-danger small">{{ form.override_reason.errors }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <span class="fw-bold">Selected Units:</span> <span id="selected-count" class="badge bg-primary">0</span>
+          <span class="text-muted small ms-2">(Max allowed: {{ remaining_unreserved }})</span>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{% url 'requisitions:detail' requisition.pk %}" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="btn-submit" disabled>Confirm Allocation</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const checkboxes = document.querySelectorAll('.unit-checkbox');
+  const unitIdsInput = document.getElementById('id_unit_ids');
+  const selectedCountBadge = document.getElementById('selected-count');
+  const submitBtn = document.getElementById('btn-submit');
+  const overrideCard = document.getElementById('override-card');
+  const overrideInput = document.getElementById('id_override_reason');
+  const maxAllowed = {{ remaining_unreserved }};
+
+  function updateSelection() {
+    const selected = [];
+    let hasIncompatible = false;
+
+    // Track checked IDs uniquely (a unit might appear in suggestions and all stock)
+    const checkedUnitIds = new Set();
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        checkedUnitIds.add(cb.value);
+        if (cb.dataset.compatible === 'false') {
+          hasIncompatible = true;
+        }
+      }
+    });
+
+    const selectedIds = Array.from(checkedUnitIds);
+    unitIdsInput.value = selectedIds.join(',');
+    selectedCountBadge.textContent = selectedIds.length;
+
+    // Show/hide override rationale section
+    if (hasIncompatible) {
+      overrideCard.style.display = 'block';
+      overrideInput.setAttribute('required', 'required');
+    } else {
+      overrideCard.style.display = 'none';
+      overrideInput.removeAttribute('required');
+    }
+
+    // Enable/disable submit
+    if (selectedIds.length > 0 && selectedIds.length <= maxAllowed) {
+      submitBtn.removeAttribute('disabled');
+    } else {
+      submitBtn.setAttribute('disabled', 'disabled');
+    }
+  }
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', function() {
+      // Keep duplicate checkboxes for same unit ID in sync
+      const sameValCheckboxes = document.querySelectorAll(`.unit-checkbox[value="${this.value}"]`);
+      sameValCheckboxes.forEach(other => other.checked = this.checked);
+      updateSelection();
+    });
+  });
+});
+</script>
+{% endblock %}

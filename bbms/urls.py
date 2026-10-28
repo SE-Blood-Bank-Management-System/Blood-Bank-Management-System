@@ -65,6 +65,27 @@ urlpatterns = [
         appointment_views.api_appointment_detail,
         name='api_root_appointment_detail'
     ),
+    # Allocation & Dispatch API endpoints (SAD Section 4.3, Issue #37)
+    path(
+        'api/requisitions/<int:requisition_pk>/suggestions/',
+        inventory_views.api_fefo_suggestions,
+        name='api_root_fefo_suggestions'
+    ),
+    path(
+        'api/requisitions/<int:requisition_pk>/allocate/',
+        inventory_views.api_allocate_units,
+        name='api_root_allocate_units'
+    ),
+    path(
+        'api/requisitions/<int:requisition_pk>/dispatch/',
+        inventory_views.api_dispatch_units,
+        name='api_root_dispatch_units'
+    ),
+    path(
+        'api/manifests/<str:manifest_id>/',
+        inventory_views.api_manifest_detail,
+        name='api_root_manifest_detail'
+    ),
 ]
 
 if settings.DEBUG:
