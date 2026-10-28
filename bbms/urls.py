@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/donors/', include('donors.api_urls', namespace='donor_api')),
     path('appointments/', include('appointments.urls', namespace='appointments')),
     path('inventory/', include('inventory.urls', namespace='inventory')),
+    path('requisitions/', include('requisitions.urls', namespace='requisitions')),
+    path('api/requests/', include('requisitions.api_urls', namespace='requisition_api')),
     # REST API endpoints (SAD Section 4.3)
     path('api/inventory/', inventory_views.api_inventory, name='api_root_inventory'),
     path('api/quarantine/', inventory_views.quarantine_list, name='api_quarantine'),
