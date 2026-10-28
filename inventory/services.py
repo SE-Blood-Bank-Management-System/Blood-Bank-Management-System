@@ -472,3 +472,117 @@ def cancel_reservation(allocation_pk, *, actor, reason=''):
             raise
         raise AllocationConflict('Database is locked. Refresh and retry.') from exc
 
+
+def dispatch_allocated_units(*, requisition_pk, unit_ids, actor, notes='', expected_version=None):
+    """
+    Atomically dispatch allocated blood units against an approved requisition.
+    Rechecks safety and expiry at dispatch, records audit evidence, generates
+    a DispatchManifest, and calls record_dispatched_units() to update requisition
+    fulfilment status (SRS BBMS-F-053, BBMS-F-054, BBMS-F-055).
+    """
+    actor = require_staff(actor)
+    unit_ids = list(unit_ids)
+    if not unit_ids or any(type(pk) is not int for pk in unit_ids) or len(set(unit_ids)) != len(unit_ids):
+        raise ValidationError('Select distinct, persisted Bag IDs for dispatch.')
+
+    notes = (notes or '').strip()
+
+    try:
+        with transaction.atomic():
+            requisition = Requisition.objects.get(pk=requisition_pk)
+            if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+                raise AllocationConflict('Dispatch requires an approved or partially fulfilled requisition.')
+
+            if expected_version is not None and requisition.version != expected_version:
+                raise AllocationConflict('This requisition changed. Refresh before submitting again.')
+
+            # Fetch allocations for these units and this requisition
+            allocations = list(
+                Allocation.objects.filter(
+                    requisition=requisition,
+                    blood_unit_id__in=unit_ids,
+                    status=AllocationStatus.RESERVED,
+                ).select_related('blood_unit').select_for_update()
+            )
+
+            if len(allocations) != len(unit_ids):
+                allocated_ids = {a.blood_unit_id for a in allocations}
+                missing_ids = set(unit_ids) - allocated_ids
+                raise ValidationError(
+                    f'Every unit must have an active reservation for this requisition. '
+                    f'Missing or unreserved unit IDs: {missing_ids}.'
+                )
+
+            now = timezone.now()
+            units_to_dispatch = []
+
+            for alloc in allocations:
+                unit = alloc.blood_unit
+
+                if unit.status != BloodUnitStatus.ALLOCATED:
+                    raise ValidationError(
+                        f'Unit {unit.bag_id} cannot be dispatched: current status is {unit.status} (expected Allocated).'
+                    )
+
+                # Safety recheck at dispatch time: Expiry (BBMS-F-039)
+                if not unit.expiry_date or unit.expiry_date <= now:
+                    raise ValidationError(
+                        f'Cannot dispatch unit {unit.bag_id}: unit has expired on {unit.expiry_date}.'
+                    )
+
+                # Safety recheck at dispatch time: Serology (BBMS-F-024)
+                if not unit.has_passed_serology:
+                    raise ValidationError(
+                        f'Cannot dispatch unit {unit.bag_id}: unit has not passed mandatory serology testing.'
+                    )
+
+                # Safety recheck at dispatch time: Component
+                if unit.component_type != requisition.component_type:
+                    raise ValidationError(
+                        f'Cannot dispatch unit {unit.bag_id}: component {unit.component_type} does not match '
+                        f'requisition {requisition.component_type}.'
+                    )
+
+                units_to_dispatch.append(unit)
+
+            # Atomically update units to Dispatched (audited status change; BBMS-F-054)
+            for unit in units_to_dispatch:
+                unit.status = BloodUnitStatus.DISPATCHED
+                unit.save(
+                    actor=actor,
+                    status_reason=f'Dispatched against requisition {requisition.requisition_id}.'
+                )
+
+            # Update allocation statuses
+            for alloc in allocations:
+                alloc.status = AllocationStatus.DISPATCHED
+                alloc.save(update_fields=['status'])
+
+            # Record requisition fulfilment via requisitions domain service (BBMS-F-055)
+            from requisitions.services import record_dispatched_units
+            updated_req = record_dispatched_units(
+                requisition.pk,
+                actor=actor,
+                unit_ids=unit_ids,
+                expected_version=requisition.version,
+            )
+
+            # Create dispatch manifest (BBMS-F-053)
+            manifest = DispatchManifest.objects.create(
+                requisition=updated_req,
+                dispatched_by=actor,
+                dispatched_at=now,
+                notes=notes,
+            )
+            manifest.units.set(units_to_dispatch)
+
+            return manifest, updated_req
+
+    except OperationalError as exc:
+        if 'locked' not in str(exc).lower():
+            raise
+        raise AllocationConflict('Database is locked by another update. Refresh and retry.') from exc
+    except IntegrityError as exc:
+        raise AllocationConflict('Dispatch conflicts with another concurrent change. Refresh and retry.') from exc
+
+
