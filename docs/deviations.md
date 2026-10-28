@@ -198,7 +198,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: High
 - **Description**: Requisition fulfillment requires determining compatibility before unit allocation. Incompatible units must be blocked from allocation unless an authorized staff member provides an explicit clinical override justification.
 - **Sprint 1 Baseline**: Red blood cell compatibility matrix is defined in `core.constants.RBC_COMPATIBILITY_RULES` and `is_blood_compatible()`.
-- **Sprint 2 Implementation (#36)**: Added component-specific transfusion compatibility policy service (`requisitions/compatibility.py`) covering RBC, Whole Blood, Fresh Frozen Plasma, and Platelets. Implemented `CrossMatchDecision(AppendOnlyModel)`, `record_cross_match()` with mandatory override justification enforcement, FEFO compatible inventory suggestions, requisition detail cross-matching interface, and `POST /api/requests/{id}/cross-match` REST API. See [compatibility and cross-matching documentation](compatibility-and-cross-matching.md).
+- **Sprint 2 Implementation (#36 & #37)**: Added component-specific transfusion compatibility policy service (`requisitions/compatibility.py`) covering RBC, Whole Blood, Fresh Frozen Plasma, and Platelets. Implemented `CrossMatchDecision(AppendOnlyModel)`, `record_cross_match()` with mandatory override justification enforcement, FEFO compatible inventory suggestions, requisition detail cross-matching interface, and `POST /api/requests/{id}/cross-match` REST API (see [compatibility and cross-matching documentation](compatibility-and-cross-matching.md)). Compatibility rules are integrated into `allocate_units_to_requisition` and UI where incompatible blood selection requires mandatory clinical justification logged as `CrossMatchOutcome.OVERRIDDEN` (verified by `TC-MATCH-01`).
 
 #### DEF-004: FEFO Unit Allocation & Stock Auto-Decrement (SRS BBMS-F-035, BBMS-F-038, BBMS-F-052 to BBMS-F-055)
 - **Assigned Owner**: Akshay Arcot (PES1UG24CS705)
@@ -206,6 +206,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Description**: When staff allocate blood units to an approved requisition, candidate units must be presented in First-Expiry-First-Out (FEFO) order (`expiry_date` ascending). Allocated units must transition to `Allocated`/`Dispatched` and immediately decrement available inventory counts.
 - **Sprint 1 Baseline**: `BloodUnit.expiry_date` is calculated; inventory dashboard displays available counts.
 - **Sprint 2 Target**: Implement dispatch record generation and FEFO suggestion queries.
+- **Status in Sprint 2 (Issue #37)**: **Resolved & Verified**. FEFO suggestion engine, `Allocation`, `DispatchManifest`, and cumulative partial/full fulfilment completed and verified by `TC-INV-01`, `TC-INV-02`, `TC-EXP-01`, and `TC-DISP-01`.
 
 #### DEF-005: Hospital Delivery Confirmation & State Transition (SRS BBMS-F-056, BBMS-F-057)
 - **Assigned Owner**: Abhinav K (PES1UG24CS701)

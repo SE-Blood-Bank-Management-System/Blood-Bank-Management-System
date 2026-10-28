@@ -3,7 +3,7 @@ Admin registration for Blood Bank Inventory models.
 SRS BBMS-F-020 to BBMS-F-023, BBMS-F-060.
 """
 from django.contrib import admin
-from .models import BloodUnit, SerologyTest, StatusChange
+from .models import Allocation, BloodUnit, DispatchManifest, SerologyTest, StatusChange
 
 
 class SerologyTestInline(admin.TabularInline):
@@ -73,4 +73,27 @@ class StatusChangeAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Allocation)
+class AllocationAdmin(admin.ModelAdmin):
+    list_display = (
+        'allocation_id', 'requisition', 'blood_unit', 'cross_match_outcome',
+        'status', 'allocated_by', 'allocated_at'
+    )
+    list_filter = ('status', 'cross_match_outcome', 'allocated_at')
+    search_fields = ('allocation_id', 'requisition__requisition_id', 'blood_unit__bag_id', 'allocated_by__username')
+    readonly_fields = (
+        'allocation_id', 'requisition', 'blood_unit', 'cross_match_outcome',
+        'override_reason', 'allocated_by', 'allocated_at'
+    )
+
+
+@admin.register(DispatchManifest)
+class DispatchManifestAdmin(admin.ModelAdmin):
+    list_display = ('manifest_id', 'requisition', 'dispatched_by', 'dispatched_at', 'unit_count')
+    list_filter = ('dispatched_at',)
+    search_fields = ('manifest_id', 'requisition__requisition_id', 'dispatched_by__username', 'notes')
+    readonly_fields = ('manifest_id', 'requisition', 'dispatched_by', 'dispatched_at', 'units', 'notes')
+
 

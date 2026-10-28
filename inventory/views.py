@@ -10,7 +10,7 @@ SRS References:
 import json
 from datetime import timedelta
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,23 +21,36 @@ from django.views.decorators.http import require_http_methods, require_safe
 from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
+from requisitions.models import Requisition
 from .forms import (
+    AllocationForm,
     BloodCollectionForm,
     BloodGroupCorrectionForm,
     ComponentSeparationForm,
+    DispatchForm,
     InventoryFilterForm,
     SerologyPanelForm,
 )
 from .models import (
+    Allocation,
+    AllocationStatus,
     BloodUnit,
     BloodUnitStatus,
     ComponentType,
+    CrossMatchOutcome,
+    DispatchManifest,
     SerologyResult,
     SerologyTestType,
 )
 from .services import (
+    AllocationConflict,
+    allocate_units_to_requisition,
+    cancel_reservation,
+    dispatch_allocated_units,
     filter_and_search_inventory,
     get_active_locations,
+    get_available_units_for_requisition,
+    get_fefo_allocation_suggestions,
     get_inventory_counts,
     process_expired_units,
 )
@@ -574,6 +587,338 @@ def api_record_serology(request, bag_id):
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)
+def allocate_requisition_view(request, requisition_pk):
+    """
+    Staff view for FEFO suggestion review and manual Bag ID allocation
+    to an approved requisition.
+    SRS BBMS-F-035, BBMS-F-038, BBMS-F-050, BBMS-F-052.
+    """
+    requisition = get_object_or_404(Requisition, pk=requisition_pk)
+
+    if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+        messages.error(
+            request,
+            f"Requisition {requisition.requisition_id} is in status '{requisition.status}' "
+            f"and cannot receive allocations."
+        )
+        return redirect('requisitions:detail', pk=requisition.pk)
+
+    current_reserved = requisition.allocations.filter(status=AllocationStatus.RESERVED).count()
+    remaining_unreserved = requisition.remaining_quantity - current_reserved
+
+    if remaining_unreserved <= 0:
+        messages.info(
+            request,
+            f"Requisition {requisition.requisition_id} already has all required units reserved or dispatched."
+        )
+        return redirect('requisitions:detail', pk=requisition.pk)
+
+    if request.method == 'POST':
+        form = AllocationForm(request.POST)
+        if form.is_valid():
+            unit_ids = form.cleaned_data['unit_ids']
+            override_reason = form.cleaned_data.get('override_reason', '')
+            try:
+                allocations = allocate_units_to_requisition(
+                    requisition_pk=requisition.pk,
+                    unit_ids=unit_ids,
+                    actor=request.user,
+                    override_reason=override_reason,
+                )
+                messages.success(
+                    request,
+                    f"Successfully allocated {len(allocations)} unit(s) to requisition {requisition.requisition_id} "
+                    f"(SRS BBMS-F-052)."
+                )
+                return redirect('requisitions:detail', pk=requisition.pk)
+            except ValidationError as exc:
+                messages.error(request, str(exc.message if hasattr(exc, 'message') else exc))
+            except AllocationConflict as exc:
+                messages.error(request, str(exc))
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = AllocationForm()
+
+    fefo_suggestions = get_fefo_allocation_suggestions(requisition)
+    all_available = get_available_units_for_requisition(requisition)
+
+    return render(request, 'inventory/allocate.html', {
+        'requisition': requisition,
+        'remaining_unreserved': remaining_unreserved,
+        'current_reserved': current_reserved,
+        'fefo_suggestions': fefo_suggestions,
+        'available_units': all_available,
+        'form': form,
+    })
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+def dispatch_requisition_view(request, requisition_pk):
+    """
+    Staff view for generating a dispatch manifest and dispatching reserved units.
+    SRS BBMS-F-053, BBMS-F-054, BBMS-F-055.
+    """
+    requisition = get_object_or_404(Requisition, pk=requisition_pk)
+
+    if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+        messages.error(
+            request,
+            f"Requisition {requisition.requisition_id} is in status '{requisition.status}' and cannot be dispatched."
+        )
+        return redirect('requisitions:detail', pk=requisition.pk)
+
+    reserved_allocations = list(
+        requisition.allocations.filter(status=AllocationStatus.RESERVED).select_related('blood_unit')
+    )
+
+    if not reserved_allocations:
+        messages.warning(
+            request,
+            f"Requisition {requisition.requisition_id} has no reserved units to dispatch. Allocate units first."
+        )
+        return redirect('inventory:allocate_requisition', requisition_pk=requisition.pk)
+
+    if request.method == 'POST':
+        form = DispatchForm(request.POST)
+        if form.is_valid():
+            unit_ids = form.cleaned_data['unit_ids']
+            notes = form.cleaned_data.get('notes', '')
+            try:
+                manifest, updated_req = dispatch_allocated_units(
+                    requisition_pk=requisition.pk,
+                    unit_ids=unit_ids,
+                    actor=request.user,
+                    notes=notes,
+                )
+                messages.success(
+                    request,
+                    f"Dispatch successful! Generated Manifest {manifest.manifest_id}. "
+                    f"Requisition status: {updated_req.status} (SRS BBMS-F-053, BBMS-F-055)."
+                )
+                return redirect('inventory:manifest_detail', manifest_id=manifest.manifest_id)
+            except ValidationError as exc:
+                messages.error(request, str(exc.message if hasattr(exc, 'message') else exc))
+            except AllocationConflict as exc:
+                messages.error(request, str(exc))
+        else:
+            messages.error(request, "Please correct the errors in the dispatch form.")
+    else:
+        all_unit_ids = ','.join(str(a.blood_unit_id) for a in reserved_allocations)
+        form = DispatchForm(initial={'unit_ids': all_unit_ids})
+
+    return render(request, 'inventory/dispatch.html', {
+        'requisition': requisition,
+        'reserved_allocations': reserved_allocations,
+        'form': form,
+    })
+
+
+def manifest_detail_view(request, manifest_id):
+    """
+    Readable and printable dispatch manifest document view.
+    SRS BBMS-F-053.
+    """
+    manifest = get_object_or_404(
+        DispatchManifest.objects.select_related('requisition', 'requisition__hospital', 'dispatched_by'),
+        manifest_id=manifest_id
+    )
+
+    user = request.user
+    if not user.is_authenticated:
+        return redirect('accounts:login')
+
+    is_staff = user.role in (User.Role.STAFF, User.Role.ADMIN) or user.is_staff or user.is_superuser
+    is_owner = user.role == User.Role.HOSPITAL and manifest.requisition.hospital_id == user.pk
+
+    if not (is_staff or is_owner):
+        raise PermissionDenied("You do not have permission to view this dispatch manifest.")
+
+    units = list(manifest.units.all().select_related('collected_by', 'donor'))
+
+    return render(request, 'inventory/manifest_detail.html', {
+        'manifest': manifest,
+        'requisition': manifest.requisition,
+        'units': units,
+        'is_staff': is_staff,
+    })
+
+
+# ==============================================================================
+# REST API Endpoints (SAD Section 4.3)
+# ==============================================================================
+
+@never_cache
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_safe
+def api_fefo_suggestions(request, requisition_pk):
+    """
+    REST API returning FEFO suggested blood units for an approved requisition.
+    GET /api/inventory/requisitions/{pk}/suggestions/
+    SRS BBMS-F-038.
+    """
+    requisition = get_object_or_404(Requisition, pk=requisition_pk)
+    suggestions = get_fefo_allocation_suggestions(requisition)
+
+    data = {
+        'requisition_id': requisition.requisition_id,
+        'blood_group': requisition.blood_group,
+        'component_type': requisition.component_type,
+        'remaining_quantity': requisition.remaining_quantity,
+        'suggested_units': [
+            {
+                'id': u.id,
+                'bag_id': u.bag_id,
+                'blood_group': u.blood_group,
+                'component_type': u.component_type,
+                'expiry_date': u.expiry_date.isoformat() if u.expiry_date else None,
+                'collection_date': u.collection_date.isoformat(),
+                'location': u.location,
+            }
+            for u in suggestions
+        ],
+    }
+    return JsonResponse(data, status=200)
+
+
+@never_cache
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["POST"])
+def api_allocate_units(request, requisition_pk):
+    """
+    REST API for atomically allocating blood units to an approved requisition.
+    POST /api/inventory/requisitions/{pk}/allocate/
+    SRS BBMS-F-050, BBMS-F-052.
+    """
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    unit_ids = body.get('unit_ids')
+    override_reason = body.get('override_reason', '')
+    expected_version = body.get('expected_version')
+
+    if not isinstance(unit_ids, list) or not unit_ids:
+        return JsonResponse({'error': 'unit_ids must be a non-empty array of integers.'}, status=400)
+
+    try:
+        allocations = allocate_units_to_requisition(
+            requisition_pk=requisition_pk,
+            unit_ids=unit_ids,
+            actor=request.user,
+            override_reason=override_reason,
+            expected_version=expected_version,
+        )
+        return JsonResponse({
+            'status': 'success',
+            'allocated_count': len(allocations),
+            'allocations': [
+                {
+                    'allocation_id': a.allocation_id,
+                    'bag_id': a.blood_unit.bag_id,
+                    'cross_match_outcome': a.cross_match_outcome,
+                    'status': a.status,
+                }
+                for a in allocations
+            ]
+        }, status=201)
+    except AllocationConflict as exc:
+        return JsonResponse({'error': str(exc)}, status=409)
+    except ValidationError as exc:
+        msg = exc.message if hasattr(exc, 'message') else str(exc)
+        return JsonResponse({'error': msg}, status=400)
+
+
+@never_cache
+@role_required(User.Role.STAFF, User.Role.ADMIN)
+@require_http_methods(["POST"])
+def api_dispatch_units(request, requisition_pk):
+    """
+    REST API for executing dispatch against reserved units and creating manifest.
+    POST /api/inventory/requisitions/{pk}/dispatch/
+    SRS BBMS-F-053, BBMS-F-054, BBMS-F-055.
+    """
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    unit_ids = body.get('unit_ids')
+    notes = body.get('notes', '')
+    expected_version = body.get('expected_version')
+
+    if not isinstance(unit_ids, list) or not unit_ids:
+        return JsonResponse({'error': 'unit_ids must be a non-empty array of integers.'}, status=400)
+
+    try:
+        manifest, updated_req = dispatch_allocated_units(
+            requisition_pk=requisition_pk,
+            unit_ids=unit_ids,
+            actor=request.user,
+            notes=notes,
+            expected_version=expected_version,
+        )
+        return JsonResponse({
+            'status': 'success',
+            'manifest_id': manifest.manifest_id,
+            'dispatched_at': manifest.dispatched_at.isoformat(),
+            'requisition_status': updated_req.status,
+            'dispatched_quantity': updated_req.dispatched_quantity,
+            'remaining_quantity': updated_req.remaining_quantity,
+            'bag_ids': manifest.bag_ids,
+        }, status=200)
+    except AllocationConflict as exc:
+        return JsonResponse({'error': str(exc)}, status=409)
+    except ValidationError as exc:
+        msg = exc.message if hasattr(exc, 'message') else str(exc)
+        return JsonResponse({'error': msg}, status=400)
+
+
+@never_cache
+@require_safe
+def api_manifest_detail(request, manifest_id):
+    """
+    REST API endpoint returning dispatch manifest details.
+    GET /api/inventory/manifests/{manifest_id}/
+    SRS BBMS-F-053.
+    """
+    manifest = get_object_or_404(
+        DispatchManifest.objects.select_related('requisition', 'requisition__hospital', 'dispatched_by'),
+        manifest_id=manifest_id
+    )
+
+    user = request.user
+    if not user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required.'}, status=401)
+
+    is_staff = user.role in (User.Role.STAFF, User.Role.ADMIN) or user.is_staff or user.is_superuser
+    is_owner = user.role == User.Role.HOSPITAL and manifest.requisition.hospital_id == user.pk
+
+    if not (is_staff or is_owner):
+        return JsonResponse({'error': 'Access denied.'}, status=403)
+
+    return JsonResponse({
+        'manifest_id': manifest.manifest_id,
+        'requisition_id': manifest.requisition.requisition_id,
+        'hospital': manifest.requisition.hospital.hospital_name or manifest.requisition.hospital.username,
+        'dispatched_by': manifest.dispatched_by.username,
+        'dispatched_at': manifest.dispatched_at.isoformat(),
+        'notes': manifest.notes,
+        'units': [
+            {
+                'bag_id': u.bag_id,
+                'blood_group': u.blood_group,
+                'component_type': u.component_type,
+                'volume_ml': u.volume_ml,
+                'expiry_date': u.expiry_date.isoformat() if u.expiry_date else None,
+            }
+            for u in manifest.units.all()
+        ],
+    }, status=200)
+
+
+@role_required(User.Role.STAFF, User.Role.ADMIN)
 @require_http_methods(["GET", "POST"])
 def separate_blood_unit(request, bag_id):
     """
@@ -762,5 +1107,3 @@ def api_expire_units(request):
         'as_of': result['as_of'].isoformat(),
         'dry_run': result['dry_run'],
     }, status=200)
-
-

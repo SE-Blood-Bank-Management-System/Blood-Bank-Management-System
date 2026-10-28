@@ -38,45 +38,67 @@
       {% endif %}
     </div></div></div>
     {% elif not is_hospital and requisition.status == 'Approved' or not is_hospital and requisition.status == 'Partially Fulfilled' %}
-    <div class="col-lg-5"><div class="card shadow-sm"><div class="card-body">
-      <h2 class="h5 text-primary"><i class="bi bi-shield-check me-1"></i>Cross-Match &amp; Override</h2>
-      <p class="small text-muted mb-2">Check unit compatibility against requested <strong>{{ requisition.blood_group }} ({{ requisition.component_type }})</strong>. Incompatible units require an authorized clinical override (SRS BBMS-F-049–F-051).</p>
-      
-      <div class="p-2 bg-light rounded mb-3 small">
-        <strong>Compatible Groups:</strong>
-        <div class="d-flex flex-wrap gap-1 mt-1">
-          {% for bg in compatible_groups %}
-            <span class="badge bg-success">{{ bg }}</span>
-          {% empty %}
-            <span class="text-muted">No compatible groups defined.</span>
-          {% endfor %}
-        </div>
-      </div>
-
-      {% if cross_match_form.non_field_errors %}
-        <div class="alert alert-danger small py-2 mb-3">{{ cross_match_form.non_field_errors }}</div>
-      {% endif %}
-
-      <form method="post" action="{% url 'requisitions:cross_match' requisition.pk %}">
-        {% csrf_token %}
-        <div class="mb-2">
-          <label for="id_cross_match_bag_id" class="form-label small fw-semibold">Unit Bag ID</label>
-          {{ cross_match_form.bag_id }}
-          {% if cross_match_form.bag_id.errors %}
-            <div class="text-danger small mt-1">{{ cross_match_form.bag_id.errors|striptags }}</div>
+    <div class="col-lg-5 d-flex flex-column gap-3">
+      <div class="card shadow-sm border-primary"><div class="card-body">
+        <h2 class="h5 text-primary">Fulfilment &amp; Stock Allocation</h2>
+        <p class="text-muted small mb-3">
+          Units reserved: <strong>{{ requisition.allocations.count }}</strong> |
+          Remaining needed: <strong>{{ requisition.remaining_quantity }}</strong>
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if requisition.remaining_quantity > 0 %}
+            <a href="{% url 'inventory:allocate_requisition' requisition.pk %}" class="btn btn-primary">
+              Allocate Units (FEFO)
+            </a>
+          {% endif %}
+          {% if requisition.allocations.all %}
+            <a href="{% url 'inventory:dispatch_requisition' requisition.pk %}" class="btn btn-success">
+              Dispatch Reserved Units
+            </a>
           {% endif %}
         </div>
-        <div class="mb-3">
-          <label for="id_override_reason" class="form-label small fw-semibold">Override Justification (if incompatible)</label>
-          {{ cross_match_form.override_reason }}
-          {% if cross_match_form.override_reason.errors %}
-            <div class="text-danger small mt-1">{{ cross_match_form.override_reason.errors|striptags }}</div>
-          {% endif %}
-          <div class="form-text small">{{ cross_match_form.override_reason.help_text }}</div>
+      </div></div>
+
+      <div class="card shadow-sm"><div class="card-body">
+        <h2 class="h5 text-primary"><i class="bi bi-shield-check me-1"></i>Cross-Match &amp; Override</h2>
+        <p class="small text-muted mb-2">Check unit compatibility against requested <strong>{{ requisition.blood_group }} ({{ requisition.component_type }})</strong>. Incompatible units require an authorized clinical override (SRS BBMS-F-049–F-051).</p>
+        
+        <div class="p-2 bg-light rounded mb-3 small">
+          <strong>Compatible Groups:</strong>
+          <div class="d-flex flex-wrap gap-1 mt-1">
+            {% for bg in compatible_groups %}
+              <span class="badge bg-success">{{ bg }}</span>
+            {% empty %}
+              <span class="text-muted">No compatible groups defined.</span>
+            {% endfor %}
+          </div>
         </div>
-        <button class="btn btn-primary w-100" type="submit">Record Cross-Match</button>
-      </form>
-    </div></div></div>
+
+        {% if cross_match_form.non_field_errors %}
+          <div class="alert alert-danger small py-2 mb-3">{{ cross_match_form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" action="{% url 'requisitions:cross_match' requisition.pk %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label for="id_cross_match_bag_id" class="form-label small fw-semibold">Unit Bag ID</label>
+            {{ cross_match_form.bag_id }}
+            {% if cross_match_form.bag_id.errors %}
+              <div class="text-danger small mt-1">{{ cross_match_form.bag_id.errors|striptags }}</div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="id_override_reason" class="form-label small fw-semibold">Override Justification (if incompatible)</label>
+            {{ cross_match_form.override_reason }}
+            {% if cross_match_form.override_reason.errors %}
+              <div class="text-danger small mt-1">{{ cross_match_form.override_reason.errors|striptags }}</div>
+            {% endif %}
+            <div class="form-text small">{{ cross_match_form.override_reason.help_text }}</div>
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Record Cross-Match</button>
+        </form>
+      </div></div>
+    </div>
     {% endif %}
   </div>
 
@@ -122,6 +144,57 @@
       </table>
     </div>
   </div>
+  {% endif %}
+
+  {% if requisition.allocations.exists %}
+  <h2 class="h5 mt-4">Allocated / Reserved Blood Units</h2>
+  <div class="table-responsive"><table class="table table-bordered bg-white">
+    <thead class="table-light"><tr>
+      <th>Allocation ID</th><th>Bag ID</th><th>Blood Group</th><th>Cross-Match</th><th>Status</th><th>Allocated By</th><th>Timestamp</th>
+    </tr></thead>
+    <tbody>{% for alloc in requisition.allocations.all %}<tr>
+      <td><code>{{ alloc.allocation_id }}</code></td>
+      <td><strong>{{ alloc.blood_unit.bag_id }}</strong></td>
+      <td><span class="badge bg-danger">{{ alloc.blood_unit.blood_group }}</span></td>
+      <td>
+        {% if alloc.cross_match_outcome == 'Compatible' %}
+          <span class="badge bg-success">Compatible</span>
+        {% elif alloc.cross_match_outcome == 'Overridden' %}
+          <span class="badge bg-warning text-dark">Overridden</span>
+          {% if alloc.override_reason %}<small class="d-block text-muted">{{ alloc.override_reason }}</small>{% endif %}
+        {% else %}
+          <span class="badge bg-secondary">{{ alloc.cross_match_outcome }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if alloc.status == 'Reserved' %}<span class="badge bg-warning text-dark">Reserved</span>
+        {% elif alloc.status == 'Dispatched' %}<span class="badge bg-success">Dispatched</span>
+        {% else %}<span class="badge bg-secondary">{{ alloc.status }}</span>{% endif %}
+      </td>
+      <td>{{ alloc.allocated_by.username }}</td>
+      <td>{{ alloc.allocated_at|date:'d M Y H:i' }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
+  {% if requisition.dispatch_manifests.exists %}
+  <h2 class="h5 mt-4">Dispatch Manifests (Chain of Custody)</h2>
+  <div class="table-responsive"><table class="table table-bordered bg-white">
+    <thead class="table-dark"><tr>
+      <th>Manifest ID</th><th>Dispatched At</th><th>Dispatching Staff</th><th>Units Count</th><th>Actions</th>
+    </tr></thead>
+    <tbody>{% for manifest in requisition.dispatch_manifests.all %}<tr>
+      <td><strong>{{ manifest.manifest_id }}</strong></td>
+      <td>{{ manifest.dispatched_at|date:'d M Y H:i:s' }}</td>
+      <td>{{ manifest.dispatched_by.username }}</td>
+      <td><span class="badge bg-primary">{{ manifest.unit_count }} unit(s)</span></td>
+      <td>
+        <a href="{% url 'inventory:manifest_detail' manifest.manifest_id %}" class="btn btn-sm btn-outline-primary">
+          View Manifest
+        </a>
+      </td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
   {% endif %}
 
   {% if not is_hospital and cross_matches %}

@@ -1034,3 +1034,188 @@ class SerologyTest(models.Model):
     def __str__(self):
         return f"{self.blood_unit.bag_id} - {self.test_type}: {self.result}"
 
+
+def generate_allocation_id():
+    """Generate unique allocation ID: ALC-<YYYYMMDD>-<HEX6> (SRS BBMS-F-052)."""
+    date_str = timezone.now().strftime('%Y%m%d')
+    return f"ALC-{date_str}-{uuid.uuid4().hex[:6].upper()}"
+
+
+def generate_manifest_id():
+    """Generate unique dispatch manifest ID: MAN-<YYYYMMDD>-<HEX6> (SRS BBMS-F-053)."""
+    date_str = timezone.now().strftime('%Y%m%d')
+    return f"MAN-{date_str}-{uuid.uuid4().hex[:6].upper()}"
+
+
+class CrossMatchOutcome(models.TextChoices):
+    """
+    Cross-matching outcome recorded against an allocation (SRS BBMS-F-051).
+    """
+    COMPATIBLE = 'Compatible', 'Compatible'
+    INCOMPATIBLE = 'Incompatible', 'Incompatible'
+    OVERRIDDEN = 'Overridden', 'Overridden'
+
+
+class AllocationStatus(models.TextChoices):
+    """
+    Status of an allocation reservation.
+    """
+    RESERVED = 'Reserved', 'Reserved'
+    DISPATCHED = 'Dispatched', 'Dispatched'
+    CANCELLED = 'Cancelled', 'Cancelled'
+
+
+class Allocation(models.Model):
+    """
+    Unit allocation to an approved hospital requisition with cross-match outcome.
+    SRS BBMS-F-050, BBMS-F-051, BBMS-F-052.
+    """
+    allocation_id = models.CharField(
+        max_length=36,
+        unique=True,
+        default=generate_allocation_id,
+        editable=False,
+        help_text='Unique identifier for the allocation record'
+    )
+    requisition = models.ForeignKey(
+        'requisitions.Requisition',
+        on_delete=models.PROTECT,
+        related_name='allocations',
+        help_text='Approved requisition this unit is allocated to (BBMS-F-052)'
+    )
+    blood_unit = models.ForeignKey(
+        BloodUnit,
+        on_delete=models.PROTECT,
+        related_name='allocations',
+        help_text='Allocated blood unit (BBMS-F-052)'
+    )
+    cross_match_outcome = models.CharField(
+        max_length=20,
+        choices=CrossMatchOutcome.choices,
+        default=CrossMatchOutcome.COMPATIBLE,
+        help_text='Cross-matching outcome: Compatible, Incompatible, Overridden (BBMS-F-051)'
+    )
+    override_reason = models.TextField(
+        blank=True,
+        help_text='Clinical justification required when allocating incompatible unit (BBMS-F-050)'
+    )
+    allocated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_allocations',
+        help_text='Staff member who performed the allocation (BBMS-F-052)'
+    )
+    allocated_at = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        help_text='Timestamp when allocation was performed'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=AllocationStatus.choices,
+        default=AllocationStatus.RESERVED,
+        db_index=True,
+        help_text='Allocation reservation state: Reserved, Dispatched, Cancelled'
+    )
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when allocation was cancelled/released'
+    )
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='cancelled_allocations',
+        help_text='Staff member who cancelled the allocation'
+    )
+    cancellation_reason = models.TextField(
+        blank=True,
+        help_text='Reason for releasing or cancelling the reservation'
+    )
+
+    class Meta:
+        ordering = ['allocated_at', 'pk']
+        indexes = [
+            models.Index(fields=['requisition', 'status']),
+            models.Index(fields=['blood_unit', 'status']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['blood_unit'],
+                condition=models.Q(status='Reserved'),
+                name='unique_active_unit_reservation'
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(cross_match_outcome='Overridden') | ~models.Q(override_reason=''),
+                name='allocation_override_reason_required'
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.cross_match_outcome == CrossMatchOutcome.OVERRIDDEN and not self.override_reason.strip():
+            raise ValidationError({'override_reason': 'Override reason is mandatory for overridden allocations.'})
+
+    def __str__(self):
+        return f"{self.allocation_id}: {self.blood_unit.bag_id} -> {self.requisition.requisition_id} [{self.status}]"
+
+
+class DispatchManifest(models.Model):
+    """
+    Formal dispatch manifest recording requisition ID, allocated Bag IDs,
+    dispatching staff identity, and server timestamp.
+    SRS BBMS-F-053, BBMS-F-054, BBMS-F-055.
+    """
+    manifest_id = models.CharField(
+        max_length=36,
+        unique=True,
+        default=generate_manifest_id,
+        editable=False,
+        help_text='Unique dispatch manifest tracking identifier (BBMS-F-053)'
+    )
+    requisition = models.ForeignKey(
+        'requisitions.Requisition',
+        on_delete=models.PROTECT,
+        related_name='dispatch_manifests',
+        help_text='Requisition fulfilled by this dispatch (BBMS-F-053)'
+    )
+    dispatched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='conducted_dispatches',
+        help_text='Staff member who conducted the dispatch (BBMS-F-053)'
+    )
+    dispatched_at = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        help_text='Server timestamp of dispatch execution (BBMS-F-053)'
+    )
+    units = models.ManyToManyField(
+        BloodUnit,
+        related_name='dispatch_manifests',
+        help_text='Dispatched blood units listed on this manifest (BBMS-F-053)'
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text='Dispatch notes, transportation temperature or courier details'
+    )
+
+    class Meta:
+        ordering = ['-dispatched_at', '-pk']
+        verbose_name = 'Dispatch Manifest'
+        verbose_name_plural = 'Dispatch Manifests'
+
+    @property
+    def unit_count(self):
+        return self.units.count()
+
+    @property
+    def bag_ids(self):
+        return list(self.units.values_list('bag_id', flat=True))
+
+    def __str__(self):
+        return f"{self.manifest_id} - Requisition {self.requisition.requisition_id} ({self.dispatched_at:%Y-%m-%d %H:%M})"
+
+
