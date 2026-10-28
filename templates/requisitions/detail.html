@@ -4,7 +4,7 @@
 <div class="container">
   <a href="{% url 'requisitions:list' %}" class="btn btn-link ps-0">Back to requisitions</a>
   <h1 class="h4 text-break">{{ requisition.requisition_id }}</h1>
-  {{ review_form.non_field_errors }}{{ priority_form.non_field_errors }}
+  {{ review_form.non_field_errors }}{{ priority_form.non_field_errors }}{{ cross_match_form.non_field_errors }}
   <div class="row g-4 mt-1">
     <div class="col-lg-7"><div class="card shadow-sm"><div class="card-body">
       <h2 class="h5">Request summary</h2>
@@ -52,6 +52,10 @@
           {% endfor %}
         </div>
       </div>
+
+      {% if cross_match_form.non_field_errors %}
+        <div class="alert alert-danger small py-2 mb-3">{{ cross_match_form.non_field_errors }}</div>
+      {% endif %}
 
       <form method="post" action="{% url 'requisitions:cross_match' requisition.pk %}">
         {% csrf_token %}
