@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Requisition {{ requisition.requisition_id }} · BBMS{% endblock %}
+{% block content %}
+<div class="container">
+  <a href="{% url 'requisitions:list' %}" class="btn btn-link ps-0">Back to requisitions</a>
+  <h1 class="h4 text-break">{{ requisition.requisition_id }}</h1>
+  {{ review_form.non_field_errors }}{{ priority_form.non_field_errors }}
+  <div class="row g-4 mt-1">
+    <div class="col-lg-7"><div class="card shadow-sm"><div class="card-body">
+      <h2 class="h5">Request summary</h2>
+      <dl class="row mb-0">
+        <dt class="col-sm-5">Hospital</dt><dd class="col-sm-7">{{ requisition.hospital.hospital_name|default:requisition.hospital.username }}</dd>
+        <dt class="col-sm-5">Blood group / component</dt><dd class="col-sm-7">{{ requisition.blood_group }} / {{ requisition.component_type }}</dd>
+        <dt class="col-sm-5">Priority</dt><dd class="col-sm-7">{% if requisition.is_stat %}<span class="badge bg-danger">Emergency / STAT</span>{% else %}Routine{% endif %}</dd>
+        <dt class="col-sm-5">Status</dt><dd class="col-sm-7">{{ requisition.status }}</dd>
+        <dt class="col-sm-5">Required by</dt><dd class="col-sm-7">{{ requisition.required_by|date:'d M Y' }}</dd>
+        <dt class="col-sm-5">Requested / dispatched</dt><dd class="col-sm-7">{{ requisition.quantity }} / {{ requisition.dispatched_quantity }}</dd>
+        <dt class="col-sm-5">Units remaining</dt><dd class="col-sm-7">{{ requisition.remaining_quantity }}</dd>
+        {% if requisition.reviewed_at %}<dt class="col-sm-5">Reviewed</dt><dd class="col-sm-7">{{ requisition.reviewed_at|date:'d M Y H:i' }} by {{ requisition.reviewed_by.username }}</dd>{% endif %}
+      </dl>
+      {% if requisition.rejection_reason %}<div class="alert alert-warning mt-3 mb-0"><strong>Rejection reason:</strong> {{ requisition.rejection_reason }}</div>{% endif %}
+    </div></div></div>
+    {% if requisition.status == 'Pending' %}
+    <div class="col-lg-5"><div class="card shadow-sm"><div class="card-body">
+      {% if is_hospital %}
+        <h2 class="h5">Update priority</h2>
+        <form method="post" action="{% url 'requisitions:priority' requisition.pk %}">
+          {% csrf_token %}{% include 'requisitions/fields.html' with form=priority_form %}
+          <button class="btn btn-outline-danger" type="submit">Save priority</button>
+        </form>
+      {% else %}
+        <h2 class="h5">Staff review</h2>
+        <p class="text-muted">Approval permits allocation. Fulfilment is recorded when units are dispatched.</p>
+        <form method="post" action="{% url 'requisitions:review' requisition.pk %}">
+          {% csrf_token %}{% include 'requisitions/fields.html' with form=review_form %}
+          <button class="btn btn-primary" type="submit">Record review</button>
+        </form>
+      {% endif %}
+    </div></div></div>
+    {% endif %}
+  </div>
+  <h2 class="h5 mt-4">Request history</h2>
+  <div class="table-responsive"><table class="table table-bordered bg-white">
+    <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Status / priority</th><th scope="col">Note</th></tr></thead>
+    <tbody>{% for event in events %}<tr>
+      <td>{{ event.created_at|date:'d M Y H:i:s' }}</td><td>{{ event.actor_label }}</td><td>{{ event.action }}</td>
+      <td>{{ event.new_status }} / {% if event.new_is_stat %}Emergency / STAT{% else %}Routine{% endif %}</td><td>{{ event.note|default:'—' }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% endblock %}

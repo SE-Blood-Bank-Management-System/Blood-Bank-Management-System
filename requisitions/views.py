@@ -117,7 +117,9 @@ def priority(request, pk):
         else:
             messages.success(request, 'Request priority updated.')
             return redirect('requisitions:detail', pk=pk)
-    return render(request, 'requisitions/detail.html', _detail_context(request, requisition, priority_form=form), status=status)
+    return render(
+        request, 'requisitions/detail.html', _detail_context(request, requisition, priority_form=form), status=status,
+    )
 
 
 @role_required(User.Role.STAFF, User.Role.ADMIN)

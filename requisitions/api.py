@@ -13,7 +13,9 @@ from accounts.models import User
 from accounts.rbac import role_required
 from .forms import RequisitionForm, ReviewForm
 from .models import Requisition
-from .services import RequisitionConflict, review_requisition, set_priority, submit_requisition, visible_requisitions
+from .services import (
+    RequisitionConflict, require_hospital, review_requisition, set_priority, submit_requisition, visible_requisitions,
+)
 
 
 class PayloadError(Exception):
@@ -76,7 +78,10 @@ def request_data(requisition, include_history=False):
 @json_errors
 def requests(request):
     if request.method == 'POST':
+        require_hospital(request.user)
         data = payload(request, ['bloodGroup', 'component', 'quantity', 'requiredBy', 'isStat'])
+        if any(key in data and not isinstance(data[key], str) for key in ('bloodGroup', 'component', 'requiredBy')):
+            raise PayloadError('bloodGroup, component and requiredBy must be strings.')
         if 'quantity' in data and type(data['quantity']) is not int:
             raise PayloadError('quantity must be a positive integer.')
         if type(data.get('isStat', False)) is not bool:
