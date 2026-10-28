@@ -9,11 +9,24 @@ SRS References:
 - Section 4.12 (BBMS-F-037 to BBMS-F-039): Expiry Handling & FEFO
 """
 from datetime import timedelta
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from core.constants import BloodGroup, VALID_BLOOD_GROUPS
-from .models import BloodUnit, BloodUnitStatus, ComponentType
+from core.constants import (
+    BloodGroup, VALID_BLOOD_GROUPS, get_compatible_donor_groups, is_blood_compatible
+)
+from requisitions.models import Requisition
+from requisitions.services import require_staff
+from .models import (
+    Allocation, AllocationStatus, BloodUnit, BloodUnitStatus,
+    ComponentType, CrossMatchOutcome, DispatchManifest
+)
+
+
+class AllocationConflict(ValidationError):
+    """A competing or repeated allocation/dispatch operation needs a fresh copy of the record."""
 
 
 def get_active_locations():
@@ -226,3 +239,236 @@ def filter_and_search_inventory(
         )
 
     return queryset
+
+
+def get_fefo_allocation_suggestions(requisition, limit=None):
+    """
+    Suggest matching safe Available unexpired stock ordered by expiry (FEFO)
+    with deterministic tie breaking (SRS BBMS-F-038, BBMS-F-052).
+    """
+    if isinstance(requisition, (int, str)):
+        requisition = Requisition.objects.get(pk=requisition)
+
+    if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+        return []
+
+    # Calculate remaining unreserved units required
+    current_reserved = requisition.allocations.filter(status=AllocationStatus.RESERVED).count()
+    remaining = requisition.quantity - requisition.dispatched_quantity - current_reserved
+    if remaining <= 0:
+        return []
+
+    target_limit = limit if limit is not None else remaining
+    if target_limit <= 0:
+        return []
+
+    now = timezone.now()
+    compatible_groups = get_compatible_donor_groups(requisition.blood_group)
+
+    # Base queryset for available, unexpired units of the correct component
+    qs = BloodUnit.objects.filter(
+        component_type=requisition.component_type,
+        status=BloodUnitStatus.AVAILABLE,
+        expiry_date__gt=now,
+        blood_group__in=compatible_groups,
+    ).exclude(
+        allocations__status=AllocationStatus.RESERVED
+    )
+
+    # Deterministic FEFO ordering: earliest expiry first, then collection date, then bag_id
+    qs = qs.order_by('expiry_date', 'collection_date', 'bag_id')
+
+    # Ensure all suggested units have passed serology (BBMS-F-024)
+    suggested = []
+    for unit in qs.prefetch_related('serology_tests'):
+        if unit.has_passed_serology:
+            suggested.append(unit)
+            if len(suggested) >= target_limit:
+                break
+
+    return suggested
+
+
+def get_available_units_for_requisition(requisition):
+    """
+    Returns available unexpired safe units for this requisition's component,
+    annotating each with compatibility status and sorting with compatible
+    units first in FEFO order, followed by incompatible units in FEFO order.
+    SRS BBMS-F-038, BBMS-F-049, BBMS-F-050.
+    """
+    if isinstance(requisition, (int, str)):
+        requisition = Requisition.objects.get(pk=requisition)
+
+    now = timezone.now()
+    qs = BloodUnit.objects.filter(
+        component_type=requisition.component_type,
+        status=BloodUnitStatus.AVAILABLE,
+        expiry_date__gt=now,
+    ).exclude(
+        allocations__status=AllocationStatus.RESERVED
+    ).order_by('expiry_date', 'collection_date', 'bag_id').prefetch_related('serology_tests')
+
+    compatible_groups = set(get_compatible_donor_groups(requisition.blood_group))
+    units_info = []
+    for unit in qs:
+        if unit.has_passed_serology:
+            is_compat = unit.blood_group in compatible_groups
+            units_info.append({
+                'unit': unit,
+                'is_compatible': is_compat,
+                'cross_match_display': 'Compatible' if is_compat else 'Incompatible',
+            })
+
+    # Sort: compatible first, then FEFO order preserved
+    units_info.sort(key=lambda x: (not x['is_compatible'], x['unit'].expiry_date))
+    return units_info
+
+
+def allocate_units_to_requisition(*, requisition_pk, unit_ids, actor, override_reason='', expected_version=None):
+    """
+    Atomically allocate safe available blood units by Bag ID to an approved requisition.
+    Supports ABO/Rh compatibility validation and clinical override with justification.
+    SRS BBMS-F-035, BBMS-F-038, BBMS-F-050, BBMS-F-051, BBMS-F-052.
+    """
+    actor = require_staff(actor)
+    unit_ids = list(unit_ids)
+    if not unit_ids or any(type(pk) is not int for pk in unit_ids) or len(set(unit_ids)) != len(unit_ids):
+        raise ValidationError('Select distinct, persisted Bag IDs for allocation.')
+
+    override_reason = (override_reason or '').strip()
+
+    try:
+        with transaction.atomic():
+            requisition = Requisition.objects.get(pk=requisition_pk)
+
+            if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+                raise AllocationConflict('Allocation requires an approved or partially fulfilled requisition.')
+
+            if expected_version is not None and requisition.version != expected_version:
+                raise AllocationConflict('This requisition changed. Refresh before submitting again.')
+
+            # Check capacity / over-allocation
+            current_reserved = requisition.allocations.filter(status=AllocationStatus.RESERVED).count()
+            available_to_reserve = requisition.remaining_quantity - current_reserved
+            if len(unit_ids) > available_to_reserve:
+                raise ValidationError(
+                    f'Cannot allocate {len(unit_ids)} units; only {available_to_reserve} remaining units can be reserved.'
+                )
+
+            # Lock / retrieve units
+            units = list(
+                BloodUnit.objects.filter(pk__in=unit_ids)
+                .select_for_update()
+                .prefetch_related('serology_tests')
+            )
+            if len(units) != len(unit_ids):
+                raise ValidationError('One or more selected units could not be found.')
+
+            now = timezone.now()
+            allocations_created = []
+
+            for unit in units:
+                if unit.status != BloodUnitStatus.AVAILABLE:
+                    raise ValidationError(
+                        f'Unit {unit.bag_id} cannot be allocated: current status is {unit.status}.'
+                    )
+
+                if not unit.expiry_date or unit.expiry_date <= now:
+                    raise ValidationError(
+                        f'Unit {unit.bag_id} cannot be allocated: unit expired on {unit.expiry_date}.'
+                    )
+
+                if unit.component_type != requisition.component_type:
+                    raise ValidationError(
+                        f'Unit {unit.bag_id} component ({unit.component_type}) does not match '
+                        f'requisition ({requisition.component_type}).'
+                    )
+
+                if not unit.has_passed_serology:
+                    raise ValidationError(
+                        f'Unit {unit.bag_id} cannot be allocated: has not passed mandatory serology testing.'
+                    )
+
+                # Check if unit already has an active reservation
+                if Allocation.objects.filter(blood_unit=unit, status=AllocationStatus.RESERVED).exists():
+                    raise AllocationConflict(
+                        f'Unit {unit.bag_id} is already reserved for an active requisition.'
+                    )
+
+                # Check compatibility
+                compatible = is_blood_compatible(unit.blood_group, requisition.blood_group)
+                if not compatible:
+                    if not override_reason:
+                        raise ValidationError(
+                            f'Unit {unit.bag_id} ({unit.blood_group}) is not compatible with requested group '
+                            f'{requisition.blood_group}. An authorized override justification is required.'
+                        )
+                    outcome = CrossMatchOutcome.OVERRIDDEN
+                else:
+                    outcome = CrossMatchOutcome.COMPATIBLE
+
+                # Transition unit status to Allocated (SRS BBMS-F-035: automatically decrements available count)
+                unit.status = BloodUnitStatus.ALLOCATED
+                unit.save(
+                    actor=actor,
+                    status_reason=f'Allocated to requisition {requisition.requisition_id}. Cross-match: {outcome}.'
+                )
+
+                # Persist allocation record
+                alloc = Allocation.objects.create(
+                    requisition=requisition,
+                    blood_unit=unit,
+                    cross_match_outcome=outcome,
+                    override_reason=override_reason if outcome == CrossMatchOutcome.OVERRIDDEN else '',
+                    allocated_by=actor,
+                    status=AllocationStatus.RESERVED,
+                )
+                allocations_created.append(alloc)
+
+            return allocations_created
+
+    except OperationalError as exc:
+        if 'locked' not in str(exc).lower():
+            raise
+        raise AllocationConflict('Database is locked by another update. Refresh and retry.') from exc
+    except IntegrityError as exc:
+        raise AllocationConflict('Allocation conflicts with another concurrent change. Refresh and retry.') from exc
+
+
+def cancel_reservation(allocation_pk, *, actor, reason=''):
+    """
+    Releases an active reservation and returns the unit to Available (if unexpired).
+    """
+    actor = require_staff(actor)
+    reason = (reason or '').strip()
+
+    try:
+        with transaction.atomic():
+            allocation = Allocation.objects.select_for_update().get(pk=allocation_pk)
+            if allocation.status != AllocationStatus.RESERVED:
+                raise ValidationError(f'Only Reserved allocations can be cancelled (current: {allocation.status}).')
+
+            unit = allocation.blood_unit
+            now = timezone.now()
+
+            # Return unit to Available if unexpired, or Expired if past expiry
+            if unit.expiry_date and unit.expiry_date <= now:
+                unit.status = BloodUnitStatus.EXPIRED
+                unit.save(actor=actor, status_reason=f'Reservation cancelled; unit has expired ({reason}).')
+            else:
+                unit.status = BloodUnitStatus.AVAILABLE
+                unit.save(actor=actor, status_reason=f'Reservation cancelled: {reason or "Released by staff"}.')
+
+            allocation.status = AllocationStatus.CANCELLED
+            allocation.cancelled_at = now
+            allocation.cancelled_by = actor
+            allocation.cancellation_reason = reason
+            allocation.save(update_fields=['status', 'cancelled_at', 'cancelled_by', 'cancellation_reason'])
+
+            return allocation
+
+    except OperationalError as exc:
+        if 'locked' not in str(exc).lower():
+            raise
+        raise AllocationConflict('Database is locked. Refresh and retry.') from exc
+
