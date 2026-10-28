@@ -73,9 +73,11 @@ class ReviewAndPriorityTests(RequestTestCase):
         )
         self.assertEqual(approved.status, 'Approved')
         self.assertEqual(approved.reviewed_by, self.staff)
+        self.assertEqual(approved.events.last().action, RequisitionEvent.Action.APPROVED)
         self.assertIsNotNone(approved.reviewed_at)
         self.assertEqual(rejected.rejection_reason, 'No stock')
         self.assertEqual(rejected.events.last().actor, self.admin_user)
+        self.assertEqual(rejected.events.last().action, RequisitionEvent.Action.REJECTED)
         self.assertEqual(rejected.events.last().previous_status, 'Pending')
         self.assertEqual(rejected.events.last().note, 'No stock')
         with self.assertRaises(RequisitionConflict):

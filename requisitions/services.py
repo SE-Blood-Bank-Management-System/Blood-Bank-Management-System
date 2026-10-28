@@ -129,7 +129,8 @@ def review_requisition(requisition_pk, *, actor, action, reason='', expected_ver
     requisition.reviewed_by = actor
     requisition.reviewed_at = timezone.now()
     requisition.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
-    _event(requisition, actor, action.title(), previous, requisition.is_stat, reason)
+    event_action = RequisitionEvent.Action.APPROVED if action == 'approve' else RequisitionEvent.Action.REJECTED
+    _event(requisition, actor, event_action, previous, requisition.is_stat, reason)
     return requisition
 
 

@@ -13,9 +13,11 @@
     clearTimeout(timer);
     if (running || document.hidden) return;
     running = true;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
     try {
       const response = await fetch(alert.dataset.endpoint, {
-        credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'}
+        credentials: 'same-origin', cache: 'no-store', signal: controller.signal, headers: {Accept: 'application/json'}
       });
       if (response.status === 401 || response.status === 403) {
         // Session/role changed. Do not reveal old clinical alerts or keep polling.
@@ -36,6 +38,7 @@
       lastSignature = '';
       alert.hidden = false;
     } finally {
+      clearTimeout(timeout);
       running = false;
     }
     timer = setTimeout(refresh, interval);
