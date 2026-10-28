@@ -110,6 +110,16 @@
           {% endif %}
         {% endif %}
 
+        {% if user.is_authenticated %}
+          {% if user.role == 'HOSPITAL' or user.role == 'STAFF' or user.role == 'ADMIN' or user.is_superuser %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'requisitions:list' %}">
+                <i class="bi bi-hospital me-1"></i>{% if user.role == 'HOSPITAL' %}My Requisitions{% else %}Requisition Queue{% endif %}
+              </a>
+            </li>
+          {% endif %}
+        {% endif %}
+
         <li class="nav-item">
           <a class="nav-link" href="{% url 'core:about' %}">
             <i class="bi bi-info-circle me-1"></i>About
