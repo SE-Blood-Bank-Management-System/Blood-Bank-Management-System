@@ -70,6 +70,12 @@ class Requisition(models.Model):
 
 
 class AppendOnlyQuerySet(models.QuerySet):
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False, update_conflicts=False,
+                    update_fields=None, unique_fields=None):
+        if ignore_conflicts or update_conflicts:
+            raise ValidationError('Requisition history conflicts must not be ignored or overwritten.')
+        return super().bulk_create(objs, batch_size=batch_size)
+
     def update(self, **kwargs):
         raise ValidationError('Requisition history is append-only.')
 
@@ -87,8 +93,9 @@ class AppendOnlyModel(models.Model):
         abstract = True
 
     def save(self, *args, **kwargs):
-        if not self._state.adding:
+        if not self._state.adding or (self.pk is not None and type(self).objects.filter(pk=self.pk).exists()):
             raise ValidationError('Requisition history is append-only.')
+        kwargs['force_insert'] = True
         return super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
