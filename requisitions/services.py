@@ -8,7 +8,18 @@ from django.utils import timezone
 
 from accounts.models import User
 from inventory.models import BloodUnit, BloodUnitStatus
-from .models import Requisition, RequisitionEvent, RequisitionFulfilment
+from .compatibility import (
+    explain_compatibility,
+    get_compatible_donor_groups,
+    is_transfusion_compatible,
+)
+from .models import (
+    CrossMatchDecision,
+    CrossMatchOutcome,
+    Requisition,
+    RequisitionEvent,
+    RequisitionFulfilment,
+)
 
 
 class RequisitionConflict(ValidationError):
@@ -200,3 +211,142 @@ def pending_stat_summary(actor):
     latest = pending.order_by('-updated_at', '-pk').first()
     return {'count': pending.count(), 'latest_id': latest.requisition_id if latest else None,
             'latest_updated_at': latest.updated_at.isoformat() if latest else None}
+
+
+def evaluate_unit_for_requisition(requisition, blood_unit):
+    """
+    Evaluates unit safety, availability, and biological compatibility against a requisition.
+    SRS BBMS-F-049, BBMS-F-050.
+    """
+    now = timezone.now()
+    safety_errors = []
+
+    if blood_unit.status != BloodUnitStatus.AVAILABLE:
+        safety_errors.append(f"Unit is '{blood_unit.status}', not Available (SRS BBMS-F-028).")
+    if blood_unit.expiry_date and blood_unit.expiry_date <= now:
+        safety_errors.append("Unit has passed shelf-life and is expired (SRS BBMS-F-039).")
+    if not blood_unit.has_passed_serology:
+        safety_errors.append("Unit has not passed all four required serology screening tests (SRS BBMS-F-024).")
+    if blood_unit.component_type != requisition.component_type:
+        safety_errors.append(
+            f"Component mismatch: unit is '{blood_unit.component_type}', requested is '{requisition.component_type}'."
+        )
+    if hasattr(blood_unit, 'requisition_fulfilment'):
+        safety_errors.append("Unit is already allocated or dispatched to another requisition.")
+
+    is_compat = is_transfusion_compatible(
+        blood_unit.blood_group, requisition.blood_group, requisition.component_type
+    )
+    explanation = explain_compatibility(
+        blood_unit.blood_group, requisition.blood_group, requisition.component_type
+    )
+
+    return {
+        'is_safe': len(safety_errors) == 0,
+        'safety_errors': safety_errors,
+        'is_compatible': is_compat,
+        'explanation': explanation,
+        'requested_blood_group': requisition.blood_group,
+        'donor_blood_group': blood_unit.blood_group,
+        'component_type': requisition.component_type,
+    }
+
+
+@atomic_mutation
+def record_cross_match(requisition_pk, unit_identifier, *, actor, override_reason='', notes='', expected_version=None):
+    """
+    Evaluates cross-matching between a blood unit and requisition and records an auditable decision.
+    SRS References:
+    - BBMS-F-049: ABO/Rh transfusion compatibility check.
+    - BBMS-F-050: Incompatible units blocked unless explicit authorized override recorded.
+    - BBMS-F-051: Cross-match outcome recorded (Compatible / Incompatible / Overridden).
+    - BBMS-SR-003, BBMS-SR-004: Staff authorization and non-repudiation.
+
+    unit_identifier: BloodUnit pk (int) or bag_id (str) or BloodUnit instance.
+    """
+    actor = require_staff(actor)
+    requisition = Requisition.objects.get(pk=requisition_pk)
+
+    if requisition.status not in (Requisition.Status.APPROVED, Requisition.Status.PARTIALLY_FULFILLED):
+        raise ValidationError('Cross-matching and allocation can only be performed on approved requisitions.')
+
+    # Resolve blood unit
+    if isinstance(unit_identifier, BloodUnit):
+        unit = unit_identifier
+    elif isinstance(unit_identifier, int) or (isinstance(unit_identifier, str) and unit_identifier.isdigit()):
+        unit = BloodUnit.objects.filter(pk=int(unit_identifier)).first()
+    else:
+        unit = BloodUnit.objects.filter(bag_id=str(unit_identifier).strip()).first()
+
+    if not unit:
+        raise ValidationError(f"Blood unit '{unit_identifier}' does not exist.")
+
+    # Safety checks: Overrides NEVER bypass expiry, serology, component, or status safety!
+    evaluation = evaluate_unit_for_requisition(requisition, unit)
+    if not evaluation['is_safe']:
+        raise ValidationError(
+            f"Cannot cross-match or allocate unit {unit.bag_id}: {'; '.join(evaluation['safety_errors'])}"
+        )
+
+    is_compat = evaluation['is_compatible']
+    explanation = evaluation['explanation']
+    override_reason_clean = str(override_reason or '').strip()
+
+    if not is_compat:
+        if not override_reason_clean:
+            raise ValidationError(
+                f"Unit {unit.bag_id} ({unit.blood_group}) is biologically INCOMPATIBLE with "
+                f"requisition blood group {requisition.blood_group} for {requisition.component_type}. "
+                f"Transfusion is blocked unless an authorized staff member supplies an explicit "
+                f"override justification (SRS BBMS-F-050)."
+            )
+        outcome = CrossMatchOutcome.OVERRIDDEN
+        is_overridden = True
+    else:
+        outcome = CrossMatchOutcome.COMPATIBLE
+        is_overridden = False
+
+    decision = CrossMatchDecision.objects.create(
+        requisition=requisition,
+        blood_unit=unit,
+        requested_blood_group=requisition.blood_group,
+        donor_blood_group=unit.blood_group,
+        component_type=requisition.component_type,
+        outcome=outcome,
+        is_compatible=is_compat,
+        is_overridden=is_overridden,
+        override_reason=override_reason_clean if is_overridden else '',
+        performed_by=actor,
+        performed_by_label=actor.username,
+        explanation=explanation,
+    )
+
+    event_note = f"Cross-match for unit {unit.bag_id} ({unit.blood_group} -> {requisition.blood_group}): {outcome}."
+    if is_overridden:
+        event_note += f" Override justification: {override_reason_clean}"
+    _event(
+        requisition, actor, RequisitionEvent.Action.CROSS_MATCH_RECORDED,
+        requisition.status, requisition.is_stat, event_note
+    )
+
+    return decision
+
+
+def get_compatible_inventory_for_requisition(requisition):
+    """
+    Returns available units matching the requisition's component type and compatible
+    blood groups, ordered in First-Expiry-First-Out (FEFO) sequence (SRS BBMS-F-035, BBMS-F-049).
+    Excludes units that have already been fulfilled/allocated to requisitions.
+    """
+    compatible_groups = get_compatible_donor_groups(
+        requisition.blood_group, requisition.component_type
+    )
+
+    qs = BloodUnit.objects.available().filter(
+        component_type=requisition.component_type,
+        blood_group__in=compatible_groups,
+    ).exclude(
+        requisition_fulfilment__isnull=False
+    ).order_by('expiry_date', 'collection_date', 'pk')
+
+    return qs
