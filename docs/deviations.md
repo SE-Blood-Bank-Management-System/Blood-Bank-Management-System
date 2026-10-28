@@ -112,7 +112,7 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-F-037** | Expiry date calculation based on component type and shelf life | **Implemented** | Calculated on `Available`: 42 days Whole Blood/RBC, 5 days Platelets |
 | **BBMS-F-038–F-039** | FEFO ordering and automated Expired unit exclusion | **Deferred (Sprint 2)** | Expiry tracked; FEFO auto-allocation scheduled for Sprint 2 |
 | **BBMS-F-040–F-042** | Hospital registration, login, and approval requirement | **Implemented** | `accounts.forms.HospitalRegistrationForm`, `is_approved=False` guard |
-| **BBMS-F-043–F-048** | Hospital blood requisitions & STAT emergency queue | **Deferred (Sprint 2)** | Scheduled for Sprint 2 (Issue #13 companion) |
+| **BBMS-F-043–F-048** | Hospital blood requisitions & STAT emergency queue | **Sprint 2 implementation (#30)** | Scoped submission/history, staff review, STAT queue/alerts; actual dispatch-count integration hook. See [workflow](hospital-requisitions.md); dispatch execution remains #37. |
 | **BBMS-F-049–F-051** | Compatibility cross-matching & override logging | **Deferred (Sprint 2)** | Rules defined in `core.constants`; matching UI in Sprint 2 |
 | **BBMS-F-052–F-055** | Blood unit allocation and dispatch workflow | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Requisition module |
 | **BBMS-F-056–F-057** | Hospital delivery confirmation | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Delivery module |
@@ -191,7 +191,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: High
 - **Description**: Approved hospital users must be able to submit standard and emergency (STAT) blood requisitions specifying required blood group, component type, quantity, and required-by date. STAT requisitions must be highlighted and placed at the top of the staff processing queue.
 - **Sprint 1 Baseline**: Hospital user registration and `is_approved` gating are active.
-- **Sprint 2 Target**: Create `requisitions` app with `Requisition` model, hospital submission UI, and staff priority queue.
+- **Sprint 2 Implementation (#30)**: Added the `requisitions` app, own-hospital submission/history, staff approval/rejection, STAT-first queue and persistent five-second staff alerts. Audit-backed partial/full quantities are populated through the actual-dispatched-bag contract used by #37; allocation/dispatch execution remains separate. See [details and tests](hospital-requisitions.md).
 
 #### DEF-003: ABO/Rh Compatibility Matrix & Staff Override Audit (SRS BBMS-F-049 to BBMS-F-051)
 - **Assigned Owner**: Navaneeth Tanuboddi (PES1UG24CS709)

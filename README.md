@@ -279,3 +279,14 @@ Run `python manage.py migrate` for the new structured history table. Existing te
 notes remain available. Units with status history are protected from deletion.
 Programmatic status changes must use `unit.save(actor=staff_user)` rather than
 queryset/bulk status updates. See [rules, retention and API endpoints](docs/quarantine-status-history.md).
+
+## 14. Hospital Requisitions and STAT Queue (Issue #30)
+
+Run `python manage.py migrate`, then approved hospitals can use **Hospital Portal**
+to submit and track blood requisitions. Staff use **Requisition Queue** to approve
+or reject requests; Emergency / STAT requests are ordered first and produce a
+persistent live alert. Request history captures the actor, time and review reason.
+
+See [workflow, API routes, tests and the dispatch integration contract](docs/hospital-requisitions.md).
+Allocation/dispatch (#37) and hospital delivery confirmation (#32) build on these
+shared request records. Fulfilled quantities are backed by actual dispatched bags.
