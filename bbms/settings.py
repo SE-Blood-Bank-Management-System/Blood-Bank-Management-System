@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'donors.apps.DonorsConfig',
     'appointments.apps.AppointmentsConfig',
     'inventory.apps.InventoryConfig',
+    'requisitions.apps.RequisitionsConfig',
     'core.apps.CoreConfig',
 ]
 
