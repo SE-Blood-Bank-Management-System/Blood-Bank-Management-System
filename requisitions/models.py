@@ -119,6 +119,7 @@ class RequisitionEvent(AppendOnlyModel):
         PRIORITY_CHANGED = 'Priority changed', 'Priority changed'
         CROSS_MATCH_RECORDED = 'Cross-match recorded', 'Cross-match recorded'
         DISPATCH_RECORDED = 'Dispatch recorded', 'Dispatch recorded'
+        RECEIPT_CONFIRMED = 'Receipt confirmed', 'Receipt confirmed'
 
     requisition = models.ForeignKey(Requisition, on_delete=models.PROTECT, related_name='events')
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='requisition_events')
@@ -144,6 +145,19 @@ class RequisitionFulfilment(AppendOnlyModel):
 
     class Meta:
         ordering = ['recorded_at', 'pk']
+
+
+class DeliveryConfirmation(AppendOnlyModel):
+    """One hospital custody acknowledgement per dispatched bag (F-056/F-057)."""
+    fulfilment = models.OneToOneField(
+        RequisitionFulfilment, on_delete=models.PROTECT, related_name='delivery_confirmation',
+    )
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    receiver_label = models.CharField(max_length=150)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['received_at', 'pk']
 
 
 class CrossMatchDecision(AppendOnlyModel):

@@ -16,6 +16,7 @@ from .compatibility import (
 from .models import (
     CrossMatchDecision,
     CrossMatchOutcome,
+    DeliveryConfirmation,
     Requisition,
     RequisitionEvent,
     RequisitionFulfilment,
@@ -202,6 +203,44 @@ def record_dispatched_units(requisition_pk, *, actor, unit_ids, expected_version
     requisition.save(update_fields=['status', 'updated_at'])
     _event(requisition, actor, RequisitionEvent.Action.DISPATCH_RECORDED, previous, requisition.is_stat,
            'Dispatched Bag IDs: ' + ', '.join(unit.bag_id for unit in units))
+    return requisition
+
+
+@atomic_mutation
+def confirm_receipt(requisition_pk, *, actor, bag_ids, expected_version=None):
+    """Acknowledge actual dispatched bags; fulfilment remains dispatch-based."""
+    actor = require_hospital(actor)
+    if (not isinstance(bag_ids, list) or not bag_ids
+            or any(not isinstance(bag, str) or not bag.strip() for bag in bag_ids)
+            or len(set(bag_ids)) != len(bag_ids)):
+        raise ValidationError('Select distinct dispatched Bag IDs.')
+    requisition = Requisition.objects.get(pk=requisition_pk)
+    if requisition.hospital_id != actor.pk:
+        raise PermissionDenied('This requisition belongs to another hospital.')
+    _claim(requisition, expected_version)
+    fulfilments = list(RequisitionFulfilment.objects.filter(
+        requisition=requisition, blood_unit__bag_id__in=bag_ids,
+    ).select_related('blood_unit').order_by('blood_unit_id'))
+    if len(fulfilments) != len(bag_ids):
+        raise ValidationError('Every Bag ID must have been dispatched against this requisition.')
+    if DeliveryConfirmation.objects.filter(fulfilment__in=fulfilments).exists():
+        raise RequisitionConflict('A selected bag already has a receipt confirmation.')
+    # Lock current units rather than relying on a stale joined status.
+    units = {unit.pk: unit for unit in BloodUnit.objects.select_for_update().filter(
+        pk__in=[item.blood_unit_id for item in fulfilments],
+    ).order_by('pk')}
+    if any(unit.status != BloodUnitStatus.DISPATCHED for unit in units.values()):
+        raise RequisitionConflict('Only Dispatched units can be confirmed as received.')
+    for item in fulfilments:
+        DeliveryConfirmation.objects.create(
+            fulfilment=item, received_by=actor, receiver_label=actor.username,
+        )
+        unit = units[item.blood_unit_id]
+        unit.status = BloodUnitStatus.DELIVERED
+        unit.save(actor=actor, status_reason=f'Hospital receipt confirmed for {requisition.requisition_id}.')
+    requisition.save(update_fields=['updated_at'])
+    _event(requisition, actor, RequisitionEvent.Action.RECEIPT_CONFIRMED,
+           requisition.status, requisition.is_stat, 'Received Bag IDs: ' + ', '.join(bag_ids))
     return requisition
 
 
