@@ -81,7 +81,7 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-F-002** | Donor minimum age ($\ge 18$) validation from DOB | **Implemented** | Authoritative calculation in `clean_dob()` and `User.age` |
 | **BBMS-F-003** | Unique email address enforcement per donor | **Implemented** | `User.email` unique constraint and case-insensitive check |
 | **BBMS-F-004** | Donor authentication using email/username and password | **Implemented** | `EmailOrUsernameModelBackend` and `/accounts/login/` |
-| **BBMS-F-005** | Password reset via time-limited email link | **Deferred (Sprint 2)** | Deferred; stubbed email backend configured for local testing |
+| **BBMS-F-005** | Password reset via time-limited email link | **Implemented (Issue #45)** | Single-use 15-min reset tokens, generic enumeration-proof responses, environment-configured SMTP. See `docs/password-reset-and-security.md` |
 | **BBMS-F-006** | View and update profile details (phone, address, blood group) | **Implemented** | `accounts.views.profile_view`, `/accounts/profile/` |
 | **BBMS-F-007** | Display donation history (date, location, Bag ID, volume) | **Implemented** | `donors.views.history`, `donors.services.donation_summary` |
 | **BBMS-F-008** | Calculate next eligible donation date (90-day interval) | **Implemented** | `DONATION_MIN_INTERVAL_DAYS=90`, calendar date calculation |
@@ -126,8 +126,10 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-SR-004** | SQL injection prevention via Django ORM parameterized queries | **Implemented** | Pure ORM data access; zero concatenated raw SQL |
 | **BBMS-SR-005** | Input validation, sanitization, and context-aware HTML encoding | **Implemented** | Django forms validation + auto-escaping in DTL templates |
 | **BBMS-SR-006** | Session security, 30-min idle timeout, and HttpOnly cookies | **Implemented** | `SESSION_COOKIE_AGE = 1800`, sliding window expiry |
-| **BBMS-SR-007** | Brute-force lockout and login rate limiting | **Implemented** | Configured rate limits on authentication endpoints |
-| **BBMS-SR-008** | HTTPS/TLS and security audit trail | **Implemented** | Status and security events logged with timestamps and actors |
+| **BBMS-SR-007** | Brute-force lockout and login rate limiting | **Implemented (Issue #45)** | 15-min lockout after 5 consecutive failed attempts; $\le 10$ req/min sliding-window IP rate limiting; alias normalization |
+| **BBMS-SR-008** | HTTPS/TLS and security audit trail | **Implemented (Issue #45)** | Append-only SecurityAuditEvent, secret scrubbing, timestamped server error logging, HTTPS deployment settings |
+| **BBMS-NF-006** | Secure deployment, HTTPS redirection, HSTS, safe error handling | **Implemented (Issue #45)** | Mandatory SECRET_KEY when DEBUG=False, HSTS headers, secure cookies, generic 404/500 error pages |
+
 
 ---
 
@@ -150,6 +152,10 @@ All test cases planned for Sprint 1 have been implemented, executed, and verifie
 | **TC-SER-02** | Serology Result Completeness | Partial panel remains Quarantined, fail -> Discarded | **Pass** | `python manage.py test inventory.tests` |
 | **TC-QNT-01** | Quarantine List & Audit Logging | Elapsed time in quarantine, status log | **Pass** | `python manage.py test inventory.tests` |
 | **TC-SEC-01–07** | Security Controls & RBAC | HTTP 403 rejection, SQLi, XSS, rate limiting | **Pass** | `python manage.py test accounts.tests` |
+| **TC-SEC-07** | Account Lockout & IP Rate Limiting | 15-min lockout after 5 fails, 10 req/min/IP, alias normalization | **Pass** | `python manage.py test accounts.test_lockout_and_rate_limit` (12 tests) |
+| **TC-SEC-08** | Central Audit Trail & Error Logging | Append-only audit records, secret scrubbing, 500 error logging | **Pass** | `python manage.py test accounts.test_security_audit` (5 tests) |
+| **TC-NF-02** | Secure Deployment & HTTPS Acceptance | DEBUG=False validation, HSTS, secure cookies, generic error pages | **Pass** | `python manage.py test core.test_security_deployment` (6 tests) |
+| **TC-SMTP-01** | SMTP Message Delivery Demonstration | Live RFC 5321/5322 delivery over local TCP loopback socket | **Pass** | `python manage.py test accounts.test_smtp_delivery` (1 test) |
 | **TC-E2E-01** | End-to-End Donor Workflow | Reg &rarr; Screening &rarr; Booking &rarr; Collection &rarr; Testing | **Pass** | `python manage.py test core.test_integration_donor_workflow` (4 tests) |
 | **TC-SEED-01** | Demo Seed Data Verification | Idempotency, demo accounts, slots, testing records | **Pass** | `python manage.py test core.test_seed_data` (3 tests) |
 

@@ -221,3 +221,57 @@ class User(AbstractUser):
     def __str__(self):
         identifier = self.get_full_name() or self.username
         return f"{identifier} ({self.get_role_display()})"
+
+
+class LoginSecurityState(models.Model):
+    """
+    Durable, shared atomic state for account lockout and failed attempt tracking (SRS BBMS-SR-007).
+    Keyed by canonical user identifier (e.g. user:<id> or unknown:<normalized_identifier>).
+    """
+    identifier = models.CharField(max_length=255, unique=True, db_index=True)
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='login_security_states'
+    )
+    failed_attempts = models.PositiveIntegerField(default=0)
+    lockout_until = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_failed_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def is_locked(self, at_time=None):
+        if not self.lockout_until:
+            return False
+        current_time = at_time or timezone.now()
+        return current_time < self.lockout_until
+
+    def get_remaining_lockout_seconds(self, at_time=None):
+        if not self.is_locked(at_time):
+            return 0
+        current_time = at_time or timezone.now()
+        return max(0, int((self.lockout_until - current_time).total_seconds()))
+
+    def __str__(self):
+        status = f"LOCKED until {self.lockout_until}" if self.is_locked() else f"{self.failed_attempts} failed"
+        return f"{self.identifier} ({status})"
+
+
+class LoginRateLimitRecord(models.Model):
+    """
+    Per-IP login request tracking for sliding-window rate limiting (SRS BBMS-SR-007).
+    Enforces at most 10 login requests per minute per source IP.
+    """
+    ip_address = models.GenericIPAddressField(db_index=True)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['ip_address', 'timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.ip_address} @ {self.timestamp}"

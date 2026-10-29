@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,13 +21,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-r&k6ym7kkkvjz)yx#h%rokd-uui3-@bly@6(6-h&=n1^e=4a4x'
+# Deployment settings and environment configuration (SRS BBMS-SR-008, BBMS-NF-006)
+DEBUG = os.environ.get('BBMS_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get(
+    'BBMS_SECRET_KEY',
+    os.environ.get('SECRET_KEY', 'django-insecure-r&k6ym7kkkvjz)yx#h%rokd-uui3-@bly@6(6-h&=n1^e=4a4x' if DEBUG else '')
+)
+if not DEBUG and not SECRET_KEY:
+    raise ImproperlyConfigured('The BBMS_SECRET_KEY environment variable must be set in production (DEBUG=False).')
 
-ALLOWED_HOSTS = []
+allowed_hosts_raw = os.environ.get('BBMS_ALLOWED_HOSTS', os.environ.get('ALLOWED_HOSTS', ''))
+if allowed_hosts_raw:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_raw.split(',') if h.strip()]
+else:
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver'] if DEBUG else []
+
+csrf_origins_raw = os.environ.get('BBMS_CSRF_TRUSTED_ORIGINS', os.environ.get('CSRF_TRUSTED_ORIGINS', ''))
+if csrf_origins_raw:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins_raw.split(',') if o.strip()]
 
 
 # Application definition
@@ -50,6 +63,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'accounts.middleware.LoginProtectionMiddleware',
     'requisitions.middleware.ActivitySessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,6 +100,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 20,
+        },
     }
 }
 
@@ -151,6 +168,24 @@ LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'core:home'
 LOGOUT_REDIRECT_URL = 'core:home'
 
+# SRS BBMS-F-005: Time-limited password reset tokens (default 15 minutes = 900s)
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', 900))
+
+# SRS BBMS-F-005: Environment-configured SMTP email delivery
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0') == '1'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', '0') == '1'
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', 10))
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@bbms.local')
+
+
 # Issue #3 / BBMS-SR-006: renew the server-side expiry on every active request.
 SESSION_COOKIE_AGE = 30 * 60
 SESSION_SAVE_EVERY_REQUEST = True
@@ -159,6 +194,64 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SECURE = os.environ.get('BBMS_SECURE_COOKIES', '1') != '0'
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
+# HTTPS and Transport Security settings (SRS BBMS-SR-008, BBMS-NF-006)
+SECURE_SSL_REDIRECT = os.environ.get('BBMS_SECURE_SSL_REDIRECT', '0') == '1'
+SECURE_HSTS_SECONDS = int(os.environ.get(
+    'BBMS_SECURE_HSTS_SECONDS',
+    31536000 if (not DEBUG and SECURE_SSL_REDIRECT) else 0
+))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('BBMS_SECURE_HSTS_INCLUDE_SUBDOMAINS', '1') == '1'
+SECURE_HSTS_PRELOAD = os.environ.get('BBMS_SECURE_HSTS_PRELOAD', '1') == '1'
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+
 # BBMS-F-008: minimum calendar days after a completed donation.
 DONATION_MIN_INTERVAL_DAYS = 90
 
+# BBMS-SR-007 / BBMS-SR-008: Trusted reverse proxy configuration
+# Only proxies explicitly listed here are trusted to supply forwarded IP headers.
+BBMS_TRUSTED_PROXIES = [
+    p.strip() for p in os.environ.get('BBMS_TRUSTED_PROXIES', '').split(',') if p.strip()
+]
+if BBMS_TRUSTED_PROXIES:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+else:
+    SECURE_PROXY_SSL_HEADER = None
+
+
+# Timestamped server error and security logging (SRS BBMS-SR-008)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'timestamped': {
+            'format': '%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'timestamped',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'bbms.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'bbms.audit': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

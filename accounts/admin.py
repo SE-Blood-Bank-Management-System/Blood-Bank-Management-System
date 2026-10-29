@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
-from .models import User
+from .models import LoginRateLimitRecord, LoginSecurityState, User
 
 
 @admin.register(User)
@@ -68,3 +68,23 @@ class CustomUserAdmin(UserAdmin):
             f'{updated} account(s) successfully reactivated.',
             messages.SUCCESS
         )
+
+
+@admin.register(LoginSecurityState)
+class LoginSecurityStateAdmin(admin.ModelAdmin):
+    list_display = ('identifier', 'failed_attempts', 'lockout_until', 'last_failed_at', 'last_success_at')
+    search_fields = ('identifier',)
+    readonly_fields = ('created_at', 'updated_at', 'last_failed_at', 'last_success_at')
+    actions = ['clear_lockout']
+
+    @admin.action(description='Clear lockout and reset failed attempts for selected accounts')
+    def clear_lockout(self, request, queryset):
+        count = queryset.update(failed_attempts=0, lockout_until=None)
+        self.message_user(request, f"Lockout cleared for {count} account(s).", messages.SUCCESS)
+
+
+@admin.register(LoginRateLimitRecord)
+class LoginRateLimitRecordAdmin(admin.ModelAdmin):
+    list_display = ('ip_address', 'timestamp')
+    search_fields = ('ip_address',)
+    readonly_fields = ('ip_address', 'timestamp')
