@@ -290,3 +290,11 @@ persistent live alert. Request history captures the actor, time and review reaso
 See [workflow, API routes, tests and the dispatch integration contract](docs/hospital-requisitions.md).
 Allocation/dispatch (#37) and hospital delivery confirmation (#32) build on these
 shared request records. Fulfilled quantities are backed by actual dispatched bags.
+
+## 15. Hospital Delivery Confirmation (Issue #32)
+
+After migrating, an approved hospital can open its requisition in **Hospital
+Portal**, review allocated/dispatched bags and manifests, and confirm the bags
+received. Each confirmation records the signed-in receiver and server timestamp,
+marks the bag Delivered, and preserves dispatch-based fulfilment counts.
+See [delivery workflow, API and verification](docs/hospital-delivery.md).

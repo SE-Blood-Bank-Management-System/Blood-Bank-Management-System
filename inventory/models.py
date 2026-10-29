@@ -523,6 +523,16 @@ class BloodUnit(models.Model):
                     actor.role in ('STAFF', 'ADMIN') or actor.is_staff or actor.is_superuser
                 )
                 if not permitted:
+                    # Hospital authority requires its persisted custody acknowledgement.
+                    if (actor.is_active and actor.role == 'HOSPITAL' and actor.is_approved
+                            and old and old['status'] == BloodUnitStatus.DISPATCHED
+                            and self.status == BloodUnitStatus.DELIVERED):
+                        from requisitions.models import DeliveryConfirmation
+                        permitted = DeliveryConfirmation.objects.using(using).filter(
+                            fulfilment__blood_unit_id=self.pk,
+                            fulfilment__requisition__hospital_id=actor.pk, received_by_id=actor.pk,
+                        ).exists()
+                if not permitted:
                     raise PermissionDenied('Only authorized staff can record a status change.')
             reason = status_reason or getattr(self, '_status_reason', '')
             actor_label = actor.get_username() if actor is not None else 'System'

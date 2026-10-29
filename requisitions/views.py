@@ -11,10 +11,12 @@ from accounts.models import User
 from accounts.rbac import role_required
 from .api import json_errors
 from .compatibility import get_compatible_donor_groups
-from .forms import CrossMatchForm, PriorityForm, RequisitionForm, ReviewForm
+from .delivery import deliveries
+from .forms import CrossMatchForm, PriorityForm, ReceiptForm, RequisitionForm, ReviewForm
 from .models import Requisition
 from .services import (
     RequisitionConflict,
+    confirm_receipt,
     get_compatible_inventory_for_requisition,
     pending_stat_summary,
     record_cross_match,
@@ -73,7 +75,10 @@ def create(request):
 
 
 def _detail_context(request, requisition, **overrides):
+    dispatched = list(deliveries(requisition))
     context = {
+        'deliveries': dispatched,
+        'receipt_form': ReceiptForm(deliveries=dispatched, initial={'version': requisition.version}),
         'requisition': requisition,
         'events': requisition.events.all(),
         'review_form': ReviewForm(initial={'version': requisition.version}),
@@ -201,3 +206,23 @@ def priority(request, pk):
 @json_errors
 def stat_alerts(request):
     return JsonResponse({**pending_stat_summary(request.user), 'queue_url': reverse('requisitions:list')})
+
+
+@role_required(User.Role.HOSPITAL)
+@never_cache
+@require_POST
+def receipt(request, pk):
+    requisition = get_object_or_404(visible_requisitions(request.user), pk=pk)
+    form = ReceiptForm(request.POST, deliveries=list(deliveries(requisition)))
+    status = 400
+    if form.is_valid():
+        try:
+            confirm_receipt(pk, actor=request.user, bag_ids=form.cleaned_data['bag_ids'],
+                            expected_version=form.cleaned_data['version'])
+        except ValidationError as error:
+            status = 409 if isinstance(error, RequisitionConflict) else 400
+            _form_error(form, error)
+        else:
+            messages.success(request, 'Receipt confirmed. Selected bags are now Delivered.')
+            return redirect('requisitions:detail', pk=pk)
+    return render(request, 'requisitions/detail.html', _detail_context(request, requisition, receipt_form=form), status=status)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Requisition, RequisitionEvent, RequisitionFulfilment
+from .models import DeliveryConfirmation, Requisition, RequisitionEvent, RequisitionFulfilment
 
 
 class ReadOnlyRequestAdmin(admin.ModelAdmin):
@@ -33,3 +33,9 @@ class RequisitionEventAdmin(ReadOnlyRequestAdmin):
 class RequisitionFulfilmentAdmin(ReadOnlyRequestAdmin):
     list_display = ('requisition', 'blood_unit', 'recorded_by', 'recorded_at')
     list_select_related = ('requisition', 'blood_unit', 'recorded_by')
+
+
+@admin.register(DeliveryConfirmation)
+class DeliveryConfirmationAdmin(ReadOnlyRequestAdmin):
+    list_display = ('fulfilment', 'receiver_label', 'received_at')
+    list_select_related = ('fulfilment__blood_unit', 'received_by')
