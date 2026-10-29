@@ -275,4 +275,3 @@ class LoginRateLimitRecord(models.Model):
 
     def __str__(self):
         return f"{self.ip_address} @ {self.timestamp}"
-

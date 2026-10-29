@@ -314,4 +314,3 @@ def password_reset_complete(request):
     Success confirmation screen after resetting password (SRS BBMS-F-005).
     """
     return render(request, 'accounts/password_reset_complete.html')
-

@@ -1,8 +1,8 @@
 # Password Reset, Login Lockout, and Secure Deployment Settings
 
-**Document ID**: BBMS-DOC-045  
-**SRS Requirements**: BBMS-F-005, BBMS-SR-006, BBMS-SR-007, BBMS-SR-008, BBMS-NF-006  
-**Test Plan Cases**: TC-AUTH-01/02, TC-SEC-06, TC-SEC-07, TC-SEC-08, TC-NF-02  
+**Document ID**: BBMS-DOC-045<br>
+**SRS Requirements**: BBMS-F-005, BBMS-SR-006, BBMS-SR-007, BBMS-SR-008, BBMS-NF-006<br>
+**Test Plan Cases**: TC-AUTH-01/02, TC-SEC-06, TC-SEC-07, TC-SEC-08, TC-NF-02<br>
 **Related Issue**: #45 (Consolidates Sprint 2 issues #46 and #48)
 
 ---

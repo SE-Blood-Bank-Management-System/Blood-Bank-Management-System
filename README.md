@@ -320,4 +320,3 @@ python manage.py test accounts.test_security_audit
 python manage.py test core.test_security_deployment
 ```
 See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md).
-

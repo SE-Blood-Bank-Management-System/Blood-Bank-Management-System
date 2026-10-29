@@ -88,4 +88,3 @@ class LoginRateLimitRecordAdmin(admin.ModelAdmin):
     list_display = ('ip_address', 'timestamp')
     search_fields = ('ip_address',)
     readonly_fields = ('ip_address', 'timestamp')
-

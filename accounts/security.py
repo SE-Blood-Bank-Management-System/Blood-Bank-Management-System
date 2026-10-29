@@ -242,5 +242,3 @@ def record_ip_login_request(request, at_time=None):
             pass
 
     with_db_retry(_execute)
-
-
