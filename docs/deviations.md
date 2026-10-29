@@ -115,7 +115,7 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-F-043–F-048** | Hospital blood requisitions & STAT emergency queue | **Sprint 2 implementation (#30)** | Scoped submission/history, staff review, STAT queue/alerts; actual dispatch-count integration hook. See [workflow](hospital-requisitions.md); dispatch execution remains #37. |
 | **BBMS-F-049–F-051** | Compatibility cross-matching & override logging | **Deferred (Sprint 2)** | Rules defined in `core.constants`; matching UI in Sprint 2 |
 | **BBMS-F-052–F-055** | Blood unit allocation and dispatch workflow | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Requisition module |
-| **BBMS-F-056–F-057** | Hospital delivery confirmation | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Delivery module |
+| **BBMS-F-056–F-057** | Hospital delivery confirmation | **Implemented (Issue #32)** | Owned receipt, receiver/time and atomic Delivered transition; see docs/hospital-delivery.md |
 | **BBMS-F-058–F-059** | Tamper-evident audit logging & administrator audit log viewer | **Deferred (Sprint 2)** | Model-level status audit logs implemented; UI viewer in Sprint 2 |
 | **BBMS-F-060–F-063** | Admin user/role management & hospital approval action | **Implemented** | Admin user management and role guards implemented |
 | **BBMS-F-064–F-066** | System reports & CSV exports | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Reporting module |
@@ -214,6 +214,8 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Description**: Dispatched blood units must be confirmed as delivered by the receiving hospital user, capturing receipt timestamp and receiving staff name, updating unit status to `Delivered`.
 - **Sprint 1 Baseline**: `BloodUnitStatus.DELIVERED` status choice exists.
 - **Sprint 2 Target**: Add hospital requisition tracking view with "Confirm Delivery" action.
+- **Issue #32 implementation**: Hospital tracking and per-bag receipt history, protected HTML/API confirmation,
+  authenticated receiver/time and atomic audited Delivered transition. See `docs/hospital-delivery.md` for test evidence.
 
 #### DEF-006: Tamper-Evident Admin Audit Trail Viewer UI (SRS BBMS-F-058, BBMS-F-059)
 - **Assigned Owner**: Uttam (PES1UG24CS697)
