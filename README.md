@@ -298,3 +298,26 @@ Portal**, review allocated/dispatched bags and manifests, and confirm the bags
 received. Each confirmation records the signed-in receiver and server timestamp,
 marks the bag Delivered, and preserves dispatch-based fulfilment counts.
 See [delivery workflow, API and verification](docs/hospital-delivery.md).
+
+---
+
+## 16. Password Reset, Login Lockout, and Secure Deployment Settings (Issue #45)
+
+Users can securely recover account access via single-use, time-limited reset links (15-minute expiry) delivered via environment-configured SMTP. The system enforces strict SR-007 brute-force protections across all login routes including Django Admin:
+- **15-Minute Account Lockout**: Enforced after 5 consecutive failed attempts on an account.
+- **Alias Normalization**: Username and email aliases share the same atomic counter (`user:<pk>`), preventing counter evasion.
+- **Per-IP Rate Limiting**: Limits source IPs to at most 10 login requests per minute via a 60-second sliding window (`LoginProtectionMiddleware`), returning HTTP 429 Too Many Requests.
+- **Trusted Reverse Proxy Boundary**: Forwarded IP headers are authoritatively trusted only behind explicitly configured `BBMS_TRUSTED_PROXIES`.
+- **Tamper-Evident Audit Logging**: Append-only `SecurityAuditEvent` logs security actions and scrubs sensitive credentials and reset tokens.
+- **Production Deployment Settings**: Enforces `SECRET_KEY` when `DEBUG=False`, HSTS headers, secure cookies, and safe generic error templates (`404.html`, `500.html`).
+
+Run the automated test suites:
+```bash
+python manage.py test accounts.test_password_reset
+python manage.py test accounts.test_smtp_delivery
+python manage.py test accounts.test_lockout_and_rate_limit
+python manage.py test accounts.test_security_audit
+python manage.py test core.test_security_deployment
+```
+See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md).
+
