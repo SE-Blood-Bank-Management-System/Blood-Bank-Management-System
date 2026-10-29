@@ -231,3 +231,73 @@ class UserProfileUpdateForm(forms.ModelForm):
     def clean_phone(self):
         phone = self.cleaned_data['phone']
         return clean_contact_number(phone) if phone else phone
+
+
+class PasswordResetRequestForm(forms.Form):
+    """
+    Form requesting a password reset email (SRS BBMS-F-005).
+    Keeps email input clean and does not reveal whether the account exists.
+    """
+    email = forms.EmailField(
+        label='Email address',
+        max_length=254,
+        required=True,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'name@example.com',
+            'autocomplete': 'email',
+            'autofocus': True,
+        })
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        return email
+
+
+class SetNewPasswordForm(forms.Form):
+    """
+    Form for entering and confirming a new password during reset (SRS BBMS-F-005).
+    Enforces Django's password validators and ensures passwords match.
+    """
+    new_password1 = forms.CharField(
+        label='New password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter new password',
+            'autocomplete': 'new-password',
+            'autofocus': True,
+        }),
+        required=True,
+    )
+    new_password2 = forms.CharField(
+        label='Confirm new password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm new password',
+            'autocomplete': 'new-password',
+        }),
+        required=True,
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('new_password1')
+        p2 = cleaned_data.get('new_password2')
+
+        if p1 and p2:
+            if p1 != p2:
+                raise ValidationError("The two password fields didn't match.")
+            validate_password(p1, self.user)
+        return cleaned_data
+
+    def save(self, commit=True):
+        self.user.set_password(self.cleaned_data['new_password1'])
+        if commit:
+            self.user.save()
+        return self.user
+

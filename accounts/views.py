@@ -1,14 +1,31 @@
+import logging
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
 from django.db import IntegrityError
 from django.shortcuts import redirect, render
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
+from core.audit import record_security_event
 from donors.services import donation_summary
-from .forms import DonorRegistrationForm, HospitalRegistrationForm, LoginForm, UserProfileUpdateForm
-from .models import User
+from .forms import (
+    DonorRegistrationForm,
+    HospitalRegistrationForm,
+    LoginForm,
+    PasswordResetRequestForm,
+    SetNewPasswordForm,
+    UserProfileUpdateForm,
+)
+from .models import LoginSecurityState, User
+
+logger = logging.getLogger('bbms.security')
 
 
 @never_cache
@@ -161,3 +178,140 @@ def profile(request):
         'user': request.user,
         'form': form
     })
+
+
+@never_cache
+@require_http_methods(['GET', 'POST'])
+def password_reset_request(request):
+    """
+    Initiates a secure password reset request (SRS BBMS-F-005).
+    Delivers a single-use time-limited reset token via environment-configured SMTP.
+    Always displays a generic response to prevent user enumeration attacks.
+    """
+    if request.user.is_authenticated:
+        return redirect('core:home')
+
+    if request.method == 'POST':
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            user = User.objects.filter(email__iexact=email, is_active=True).first()
+            if user:
+                token = default_token_generator.make_token(user)
+                uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+                reset_url = request.build_absolute_uri(
+                    reverse('accounts:password_reset_confirm', kwargs={'uidb64': uidb64, 'token': token})
+                )
+                context = {
+                    'user': user,
+                    'reset_url': reset_url,
+                    'timeout_minutes': settings.PASSWORD_RESET_TIMEOUT // 60,
+                }
+                text_message = render_to_string('accounts/email/password_reset_email.txt', context)
+                html_message = render_to_string('accounts/email/password_reset_email.html', context)
+                try:
+                    send_mail(
+                        subject='BBMS - Password Reset Instructions',
+                        message=text_message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        html_message=html_message,
+                        fail_silently=False,
+                    )
+                except Exception as exc:
+                    logger.error("Failed to deliver password reset email: %s", exc)
+
+                record_security_event(
+                    action='password_reset_request',
+                    request=request,
+                    actor=user,
+                    actor_label=user.username,
+                    target_type='account',
+                    target_id=str(user.pk),
+                    details={'email': user.email},
+                    severity='INFO',
+                )
+            else:
+                record_security_event(
+                    action='password_reset_request_unknown',
+                    request=request,
+                    actor_label=email,
+                    target_type='account',
+                    details={'requested_email': email},
+                    severity='INFO',
+                )
+
+            # Generic redirection regardless of whether user exists
+            return redirect('accounts:password_reset_done')
+    else:
+        form = PasswordResetRequestForm()
+
+    return render(request, 'accounts/password_reset_request.html', {'form': form})
+
+
+def password_reset_done(request):
+    """
+    Generic confirmation screen after requesting a password reset (SRS BBMS-F-005).
+    """
+    return render(request, 'accounts/password_reset_done.html')
+
+
+@never_cache
+@require_http_methods(['GET', 'POST'])
+def password_reset_confirm(request, uidb64, token):
+    """
+    Validates single-use, time-limited reset token and allows setting a new password (SRS BBMS-F-005).
+    Clears any active account lockout on successful completion.
+    """
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid, is_active=True)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    validlink = (user is not None) and default_token_generator.check_token(user, token)
+
+    if not validlink:
+        record_security_event(
+            action='password_reset_invalid_token',
+            request=request,
+            actor=user,
+            actor_label=user.username if user else 'unknown',
+            target_type='account',
+            target_id=str(user.pk) if user else '',
+            severity='WARNING',
+        )
+        return render(request, 'accounts/password_reset_confirm.html', {'validlink': False})
+
+    if request.method == 'POST':
+        form = SetNewPasswordForm(user, request.POST)
+        if form.is_valid():
+            form.save()
+            # Clear lockout state so user can immediately sign in
+            LoginSecurityState.objects.filter(user=user).update(
+                failed_attempts=0,
+                lockout_until=None
+            )
+            record_security_event(
+                action='password_reset_success',
+                request=request,
+                actor=user,
+                actor_label=user.username,
+                target_type='account',
+                target_id=str(user.pk),
+                severity='INFO',
+            )
+            messages.success(request, 'Your password has been reset successfully. Please sign in.')
+            return redirect('accounts:password_reset_complete')
+    else:
+        form = SetNewPasswordForm(user)
+
+    return render(request, 'accounts/password_reset_confirm.html', {'form': form, 'validlink': True})
+
+
+def password_reset_complete(request):
+    """
+    Success confirmation screen after resetting password (SRS BBMS-F-005).
+    """
+    return render(request, 'accounts/password_reset_complete.html')
+
