@@ -162,3 +162,45 @@ CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 # BBMS-F-008: minimum calendar days after a completed donation.
 DONATION_MIN_INTERVAL_DAYS = 90
 
+# BBMS-SR-007 / BBMS-SR-008: Trusted reverse proxy configuration
+# Only proxies explicitly listed here are trusted to supply forwarded IP headers.
+BBMS_TRUSTED_PROXIES = [
+    p.strip() for p in os.environ.get('BBMS_TRUSTED_PROXIES', '').split(',') if p.strip()
+]
+
+# Timestamped server error and security logging (SRS BBMS-SR-008)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'timestamped': {
+            'format': '%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'timestamped',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'bbms.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'bbms.audit': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+
