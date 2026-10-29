@@ -47,6 +47,20 @@ class PriorityForm(forms.Form):
     version = forms.IntegerField(min_value=0, widget=forms.HiddenInput)
 
 
+class ReceiptForm(forms.Form):
+    bag_ids = forms.MultipleChoiceField(
+        label='Bags received', widget=forms.CheckboxSelectMultiple, choices=[],
+    )
+    version = forms.IntegerField(min_value=0, widget=forms.HiddenInput)
+
+    def __init__(self, *args, deliveries, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['bag_ids'].choices = [
+            (item.blood_unit.bag_id, item.blood_unit.bag_id) for item in deliveries
+            if item.blood_unit.status == 'Dispatched' and not hasattr(item, 'delivery_confirmation')
+        ]
+
+
 class CrossMatchForm(forms.Form):
     """
     Staff form to record cross-matching and clinical overrides (SRS BBMS-F-049, BBMS-F-050).

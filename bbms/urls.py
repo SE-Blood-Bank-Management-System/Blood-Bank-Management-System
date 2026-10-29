@@ -14,8 +14,10 @@ from django.contrib import admin
 from django.urls import include, path
 from appointments import views as appointment_views
 from inventory import views as inventory_views
+from requisitions import api as requisition_api
 
 urlpatterns = [
+    path('api/deliveries/<int:pk>/confirm/', requisition_api.confirm_delivery, name='api_confirm_delivery'),
     path('admin/', admin.site.urls),
     path('', include('core.urls', namespace='core')),
     path('accounts/', include('accounts.urls', namespace='accounts')),

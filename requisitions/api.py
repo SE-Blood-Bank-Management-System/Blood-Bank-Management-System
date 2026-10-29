@@ -12,9 +12,11 @@ from django.views.decorators.http import require_GET, require_http_methods
 from accounts.models import User
 from accounts.rbac import role_required
 from .forms import RequisitionForm, ReviewForm
+from .delivery import tracking_data
 from .models import Requisition
 from .services import (
     RequisitionConflict,
+    confirm_receipt,
     record_cross_match,
     require_hospital,
     review_requisition,
@@ -70,6 +72,7 @@ def request_data(requisition, include_history=False):
         'reviewedAt': requisition.reviewed_at.isoformat() if requisition.reviewed_at else None,
     }
     if include_history:
+        data.update(tracking_data(requisition))
         data['history'] = [{
             'action': event.action, 'actor': event.actor_label, 'timestamp': event.created_at.isoformat(),
             'previousStatus': event.previous_status, 'status': event.new_status,
@@ -204,3 +207,23 @@ def cross_match(request, pk):
         'performedBy': decision.performed_by_label,
         'performedAt': decision.performed_at.isoformat(),
     }, status=201 if decision.is_overridden else 200)
+
+
+@role_required(User.Role.HOSPITAL)
+@never_cache
+@require_http_methods(['POST'])
+@json_errors
+def confirm_delivery(request, pk):
+    from .models import RequisitionFulfilment
+    item = get_object_or_404(
+        RequisitionFulfilment.objects.filter(requisition__in=visible_requisitions(request.user))
+        .select_related('blood_unit'), pk=pk,
+    )
+    data = payload(request, ['version'])
+    if type(data.get('version')) is not int or data['version'] < 0:
+        raise PayloadError('Provide a non-negative integer version.')
+    result = confirm_receipt(item.requisition_id, actor=request.user,
+                             bag_ids=[item.blood_unit.bag_id], expected_version=data['version'])
+    return JsonResponse(request_data(result, include_history=True))
+
+
