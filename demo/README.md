@@ -7,13 +7,8 @@ This directory holds the demonstration evidence, video assets, and presentation 
 
 ## 1. Demo Video Overview
 
-The Sprint 1 demonstration video is recorded and committed at the root of the repository as [`BBMS_Demo_Sprint1.mp4`](../BBMS_Demo_Sprint1.mp4).
+https://github.com/user-attachments/assets/d119a3fc-9cf0-4850-a538-b834794d244c
 
-<video src="../BBMS_Demo_Sprint1.mp4" controls="controls" width="100%">
-  Your browser does not support the video tag. You can <a href="../BBMS_Demo_Sprint1.mp4">watch or download BBMS_Demo_Sprint1.mp4 here</a>.
-</video>
-
-- **Video File**: [▶ `BBMS_Demo_Sprint1.mp4`](../BBMS_Demo_Sprint1.mp4) (in repository root)
 - **Duration**: ~2 minutes (comprehensive end-to-end walkthrough)
 - **Resolution**: 1080p (1920x1080) at 30 fps
 - **Format**: MP4 (H.264 video, AAC audio)

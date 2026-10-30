@@ -11,8 +11,12 @@
 > - Abhinav K (PES1UG24CS701)  
 > - Akshay Arcot (PES1UG24CS705)  
 > - Navaneeth Tanuboddi (PES1UG24CS709)  
-> 
-> 🎬 **Sprint 1 Demonstration Video**: [▶ Watch `BBMS_Demo_Sprint1.mp4`](BBMS_Demo_Sprint1.mp4) &bull; [Demo Guide](demo/README.md) &bull; [Section 11](#11-sprint-demonstration-evidence--deviations-issue-5)  
+
+---
+
+## 📹 Sprint 1 Demonstration Video
+
+https://github.com/user-attachments/assets/d119a3fc-9cf0-4850-a538-b834794d244c
 
 ---
 
@@ -253,13 +257,8 @@ The donor API supports `/api/donors/me`, `/api/donors/me/donations` and
 
 ### 📹 Sprint 1 Demonstration Video
 
-Watch the complete end-to-end Sprint 1 demo video showcasing donor registration, medical eligibility screening, appointment management, collection recording, serology testing, quarantine release, and hospital account approval:
+https://github.com/user-attachments/assets/d119a3fc-9cf0-4850-a538-b834794d244c
 
-<video src="BBMS_Demo_Sprint1.mp4" controls="controls" width="100%">
-  Your browser does not support the video tag. You can <a href="BBMS_Demo_Sprint1.mp4">watch or download BBMS_Demo_Sprint1.mp4 here</a>.
-</video>
-
-- **Direct Video File**: [▶ **Watch / Download BBMS_Demo_Sprint1.mp4**](BBMS_Demo_Sprint1.mp4) (MP4, 1080p, ~2 mins)
 - **Demonstration Guide & Storyboard**: See [demo/README.md](demo/README.md) for demonstration instructions, seed account workflows, credentials, and the video storyboard.
 - **System Deviations & Defect Backlog**: See [docs/deviations.md](docs/deviations.md) for detailed documentation of architectural refinements, SRS requirement traceability across sprints, and formally assigned defects for Sprint 2.
 
