@@ -317,6 +317,8 @@ python manage.py test accounts.test_password_reset
 python manage.py test accounts.test_smtp_delivery
 python manage.py test accounts.test_lockout_and_rate_limit
 python manage.py test accounts.test_security_audit
+python manage.py test core.test_central_audit
 python manage.py test core.test_security_deployment
+python manage.py verify_audit_integrity
 ```
-See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md).
+See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md) and [central tamper-evident audit log guide](docs/central-audit-log.md).

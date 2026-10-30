@@ -116,7 +116,7 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-F-049–F-051** | Compatibility cross-matching & override logging | **Deferred (Sprint 2)** | Rules defined in `core.constants`; matching UI in Sprint 2 |
 | **BBMS-F-052–F-055** | Blood unit allocation and dispatch workflow | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Requisition module |
 | **BBMS-F-056–F-057** | Hospital delivery confirmation | **Implemented (Issue #32)** | Owned receipt, receiver/time and atomic Delivered transition; see docs/hospital-delivery.md |
-| **BBMS-F-058–F-059** | Tamper-evident audit logging & administrator audit log viewer | **Deferred (Sprint 2)** | Model-level status audit logs implemented; UI viewer in Sprint 2 |
+| **BBMS-F-058–F-059** | Tamper-evident audit logging & administrator audit log viewer | **Implemented (Issue #47)** | Central append-only audit service with SHA-256 hash chaining, CLI verification command, paginated admin viewer UI at /audit-log/, and REST API. See [docs/central-audit-log.md](central-audit-log.md) |
 | **BBMS-F-060–F-063** | Admin user/role management & hospital approval action | **Implemented** | Admin user management and role guards implemented |
 | **BBMS-F-064–F-066** | System reports & CSV exports | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Reporting module |
 | **BBMS-F-067–F-068** | Public blood availability lookup without auth | **Implemented** | `core.views.public_availability`, privacy-compliant view |
@@ -153,7 +153,8 @@ All test cases planned for Sprint 1 have been implemented, executed, and verifie
 | **TC-QNT-01** | Quarantine List & Audit Logging | Elapsed time in quarantine, status log | **Pass** | `python manage.py test inventory.tests` |
 | **TC-SEC-01–07** | Security Controls & RBAC | HTTP 403 rejection, SQLi, XSS, rate limiting | **Pass** | `python manage.py test accounts.tests` |
 | **TC-SEC-07** | Account Lockout & IP Rate Limiting | 15-min lockout after 5 fails, 10 req/min/IP, alias normalization | **Pass** | `python manage.py test accounts.test_lockout_and_rate_limit` (12 tests) |
-| **TC-SEC-08** | Central Audit Trail & Error Logging | Append-only audit records, secret scrubbing, 500 error logging | **Pass** | `python manage.py test accounts.test_security_audit` (5 tests) |
+| **TC-SEC-08** | Central Audit Trail & Error Logging | Append-only audit records, secret scrubbing, 500 error logging | **Pass** | `python manage.py test accounts.test_security_audit core.test_central_audit` |
+| **TC-AUD-01** | Central Audit Trail & Tamper Verification | Shared append audit service, SHA-256 chain verification, admin viewer UI & API, permissions, retention | **Pass** | `python manage.py test core.test_central_audit` (32 tests) |
 | **TC-NF-02** | Secure Deployment & HTTPS Acceptance | DEBUG=False validation, HSTS, secure cookies, generic error pages | **Pass** | `python manage.py test core.test_security_deployment` (6 tests) |
 | **TC-SMTP-01** | SMTP Message Delivery Demonstration | Live RFC 5321/5322 delivery over local TCP loopback socket | **Pass** | `python manage.py test accounts.test_smtp_delivery` (1 test) |
 | **TC-E2E-01** | End-to-End Donor Workflow | Reg &rarr; Screening &rarr; Booking &rarr; Collection &rarr; Testing | **Pass** | `python manage.py test core.test_integration_donor_workflow` (4 tests) |
@@ -228,7 +229,7 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: Medium
 - **Description**: Administrators require a centralized, read-only UI to inspect system-wide audit records (status transitions, collections, testing events, role modifications) filterable by date range and actor.
 - **Sprint 1 Baseline**: Per-unit text audit logs (`status_audit_log`, `blood_group_notes`) exist.
-- **Sprint 2 Target**: Dedicated `/admin/audit-log/` dashboard with non-deletable records.
+- **Sprint 2 Implementation (#47)**: **Resolved & Verified**. Implemented central append-only `SecurityAuditEvent` model with cryptographic SHA-256 hash chaining, shared `record_audit_event` service across users/units/requests/admin lifecycles, `python manage.py verify_audit_integrity` CLI command, documented trust assumptions, dedicated `/audit-log/` viewer UI with live cryptographic status and multi-criteria filters, and `/api/audit-logs/` REST API. Verified by `TC-AUD-01` (32 tests) and `TC-SEC-08`. See [central audit log docs](central-audit-log.md).
 
 #### DEF-007: CSV Analytics & Reporting Module (SRS BBMS-F-064 to BBMS-F-066)
 - **Assigned Owner**: Akshay Arcot (PES1UG24CS705)
