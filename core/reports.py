@@ -101,6 +101,9 @@ def get_inventory_report_data(location=None):
     Quarantined, Discarded, Expired, Allocated, and Dispatched units are strictly excluded.
     """
     counts = get_inventory_counts(location=location)
+    counts['total_available'] = counts['total_units_available']
+    counts['total_quarantined'] = counts['quarantined_units']
+    counts['total_discarded'] = counts['discarded_units']
     return counts
 
 

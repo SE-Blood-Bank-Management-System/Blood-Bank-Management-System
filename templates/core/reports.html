@@ -250,14 +250,9 @@
             <tfoot class="table-light fw-bold">
               <tr>
                 <td>TOTAL</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.A_POS|default:inventory_data.loc_grand_totals.A_plus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.A_NEG|default:inventory_data.loc_grand_totals.A_minus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.B_POS|default:inventory_data.loc_grand_totals.B_plus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.B_NEG|default:inventory_data.loc_grand_totals.B_minus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.AB_POS|default:inventory_data.loc_grand_totals.AB_plus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.AB_NEG|default:inventory_data.loc_grand_totals.AB_minus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.O_POS|default:inventory_data.loc_grand_totals.O_plus|default:0 }}</td>
-                <td class="text-end">{{ inventory_data.loc_grand_totals.O_NEG|default:inventory_data.loc_grand_totals.O_minus|default:0 }}</td>
+                {% for item in inventory_data.loc_grand_totals_list %}
+                  <td class="text-end">{{ item.total }}</td>
+                {% endfor %}
                 <td class="text-end text-success">{{ inventory_data.loc_grand_totals.all }}</td>
               </tr>
             </tfoot>
