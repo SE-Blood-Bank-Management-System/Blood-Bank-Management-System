@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% block title %}Central Audit Log - BBMS{% endblock %}
+{% block content %}
+<div class="container py-3">
+  {# Header #}
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-shield-check text-primary"></i>
+        Central Audit Log
+      </h2>
+      <p class="text-muted mb-0 small">
+        Tamper-evident, append-only security and domain-change history (SRS BBMS-SR-008, BBMS-F-058, BBMS-F-059).
+      </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-secondary px-3 py-2">Read-Only</span>
+      <a href="/admin/core/securityauditevent/" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-gear-fill me-1"></i>Django Admin Viewer
+      </a>
+    </div>
+  </div>
+
+  {# Cryptographic Integrity Card #}
+  <div class="card mb-4 border-0 shadow-sm {% if integrity_status.is_valid %}bg-light border-start border-success border-4{% else %}bg-danger-subtle border-start border-danger border-4{% endif %}">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          {% if integrity_status.is_valid %}
+            <i class="bi bi-shield-fill-check text-success fs-3"></i>
+            <div>
+              <div class="fw-bold text-success">Cryptographic Hash Chain: Verified &amp; Tamper-Free</div>
+              <div class="small text-muted">
+                All {{ integrity_status.verified_count }} audit records validated sequentially from genesis. Zero modifications detected.
+              </div>
+            </div>
+          {% else %}
+            <i class="bi bi-shield-fill-x text-danger fs-3"></i>
+            <div>
+              <div class="fw-bold text-danger">Cryptographic Hash Chain: VIOLATION DETECTED</div>
+              <div class="small text-danger">
+                Audit integrity check failed with {{ integrity_status.errors|length }} error(s). Log has been modified or broken.
+              </div>
+            </div>
+          {% endif %}
+        </div>
+        <div class="small text-muted font-monospace">
+          Algorithm: SHA-256 Chaining
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Filter Card #}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-3">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold text-secondary mb-1">Actor (Username / Label)</label>
+          <input type="text" name="actor" class="form-control form-control-sm" placeholder="e.g. admin_boss" value="{{ active_filters.actor }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold text-secondary mb-1">Action</label>
+          <select name="action" class="form-select form-select-sm">
+            <option value="">All Actions</option>
+            {% for act in common_actions %}
+              <option value="{{ act }}" {% if active_filters.action == act %}selected{% endif %}>{{ act }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label small fw-semibold text-secondary mb-1">Severity</label>
+          <select name="severity" class="form-select form-select-sm">
+            <option value="">All Severities</option>
+            {% for code, label in severity_choices %}
+              <option value="{{ code }}" {% if active_filters.severity == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label small fw-semibold text-secondary mb-1">Date From</label>
+          <input type="date" name="date_from" class="form-control form-control-sm" value="{{ active_filters.date_from }}">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label small fw-semibold text-secondary mb-1">Date To</label>
+          <input type="date" name="date_to" class="form-control form-control-sm" value="{{ active_filters.date_to }}">
+        </div>
+
+        <div class="col-md-9 mt-2">
+          <input type="text" name="q" class="form-control form-control-sm" placeholder="Search target ID, IP address, or keyword..." value="{{ active_filters.search }}">
+        </div>
+
+        <div class="col-md-3 mt-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+            <i class="bi bi-filter me-1"></i>Filter
+          </button>
+          <a href="{% url 'core:audit_log' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Audit Records Table Card #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <div class="fw-semibold text-dark">
+        Audit Records
+        <span class="badge bg-primary-subtle text-primary ms-1">{{ paginator.count }}</span>
+      </div>
+      <div class="small text-muted">
+        Page {{ page_obj.number }} of {{ paginator.num_pages|default:1 }}
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 font-sans">
+        <thead class="table-light small text-secondary">
+          <tr>
+            <th scope="col" style="width: 170px;">Timestamp</th>
+            <th scope="col" style="width: 90px;">Severity</th>
+            <th scope="col" style="width: 190px;">Action</th>
+            <th scope="col" style="width: 170px;">Actor / IP</th>
+            <th scope="col" style="width: 160px;">Target</th>
+            <th scope="col">Sanitized Details</th>
+            <th scope="col" style="width: 130px;">Hash Chain</th>
+          </tr>
+        </thead>
+        <tbody class="small">
+          {% for event in page_obj %}
+            <tr>
+              {# Timestamp #}
+              <td class="text-nowrap text-secondary">
+                <i class="bi bi-clock me-1 text-muted"></i>{{ event.timestamp|date:"d M Y, H:i:s" }}
+              </td>
+
+              {# Severity #}
+              <td>
+                {% if event.severity == 'INFO' %}
+                  <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">INFO</span>
+                {% elif event.severity == 'WARNING' %}
+                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">WARNING</span>
+                {% elif event.severity == 'ERROR' %}
+                  <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">ERROR</span>
+                {% elif event.severity == 'CRITICAL' %}
+                  <span class="badge bg-dark text-white">CRITICAL</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ event.severity }}</span>
+                {% endif %}
+              </td>
+
+              {# Action #}
+              <td>
+                <span class="badge bg-light text-dark font-monospace border">{{ event.action }}</span>
+              </td>
+
+              {# Actor & IP #}
+              <td>
+                <div class="fw-semibold text-dark">{{ event.actor_label }}</div>
+                <div class="text-muted small">{{ event.ip_address|default:"No IP recorded" }}</div>
+              </td>
+
+              {# Target #}
+              <td>
+                {% if event.target_type %}
+                  <span class="badge bg-secondary-subtle text-secondary border me-1">{{ event.target_type }}</span>
+                {% endif %}
+                <span class="font-monospace text-dark">{{ event.target_id|default:"-" }}</span>
+              </td>
+
+              {# Details #}
+              <td>
+                {% if event.details %}
+                  <details>
+                    <summary class="text-primary small cursor-pointer" role="button">
+                      View metadata ({{ event.details.keys|length }} fields)
+                    </summary>
+                    <pre class="bg-light p-2 border rounded mt-1 mb-0 font-monospace small" style="max-height: 140px; overflow-y: auto; white-space: pre-wrap;">{{ event.details }}</pre>
+                  </details>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+
+              {# Hash Link #}
+              <td>
+                <code class="text-muted small" title="Record Hash: {{ event.record_hash }}&#10;Previous Hash: {{ event.prev_hash }}">
+                  {{ event.record_hash|slice:":10" }}...
+                </code>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-muted text-center py-5">
+                <i class="bi bi-inbox fs-2 d-block mb-2 text-secondary"></i>
+                No audit events match the selected criteria.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Pagination #}
+    {% if page_obj.has_other_pages %}
+      <div class="card-footer bg-white py-3">
+        <nav aria-label="Audit log pagination">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">&laquo; First</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">Previous</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
+              <li class="page-item disabled"><span class="page-link">Previous</span></li>
+            {% endif %}
+
+            <li class="page-item active">
+              <span class="page-link">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">Next</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ paginator.num_pages }}{% if filter_querystring %}&{{ filter_querystring }}{% endif %}">Last &raquo;</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Next</span></li>
+              <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
