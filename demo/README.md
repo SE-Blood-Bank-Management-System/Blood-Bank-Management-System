@@ -7,9 +7,15 @@ This directory holds the demonstration evidence, video assets, and presentation 
 
 ## 1. Demo Video Overview
 
-- **Target File**: `demo/sprint1_demo.mp4`
-- **Target Duration**: Exactly 60 seconds (1 minute)
-- **Resolution**: 1080p (1920x1080) or 720p (1280x720) at 30 fps
+The Sprint 1 demonstration video is recorded and committed at the root of the repository as [`BBMS_Demo_Sprint1.mp4`](../BBMS_Demo_Sprint1.mp4).
+
+<video src="../BBMS_Demo_Sprint1.mp4" controls="controls" width="100%">
+  Your browser does not support the video tag. You can <a href="../BBMS_Demo_Sprint1.mp4">watch or download BBMS_Demo_Sprint1.mp4 here</a>.
+</video>
+
+- **Video File**: [▶ `BBMS_Demo_Sprint1.mp4`](../BBMS_Demo_Sprint1.mp4) (in repository root)
+- **Duration**: ~2 minutes (comprehensive end-to-end walkthrough)
+- **Resolution**: 1080p (1920x1080) at 30 fps
 - **Format**: MP4 (H.264 video, AAC audio)
 - **System State**: Seeded via `python manage.py seed_data`
 - **HTTP Session Flag**: `BBMS_SECURE_COOKIES=0` (for local HTTP demo)
@@ -89,5 +95,5 @@ The 1-minute video demonstration is structured to show the cohesive end-to-end S
    - Record at 1920x1080 with 100% display scaling.
 3. **Execution**:
    - Follow the second-by-second storyboard above.
-   - Save the finalized video file to:
-     `demo/sprint1_demo.mp4`
+   - Saved video file:
+     [`BBMS_Demo_Sprint1.mp4`](../BBMS_Demo_Sprint1.mp4) (in repository root)
