@@ -108,6 +108,15 @@ def register_donor(request):
                     raise
                 form.add_error('email', 'An account with this email address already exists.')
             else:
+                record_security_event(
+                    action='donor_registered',
+                    request=request,
+                    actor=user,
+                    actor_label=user.username,
+                    target_type='user',
+                    target_id=str(user.pk),
+                    details={'username': user.username, 'role': user.role, 'email': user.email},
+                )
                 login(request, user, backend='accounts.backends.EmailOrUsernameModelBackend')
                 messages.success(
                     request,
@@ -136,6 +145,20 @@ def register_hospital(request):
         form = HospitalRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
+            record_security_event(
+                action='hospital_registered',
+                request=request,
+                actor=user,
+                actor_label=user.username,
+                target_type='user',
+                target_id=str(user.pk),
+                details={
+                    'username': user.username,
+                    'hospital_name': user.hospital_name,
+                    'license_number': user.license_number,
+                    'is_approved': user.is_approved,
+                },
+            )
             messages.info(
                 request,
                 f'Registration for {user.hospital_name or user.username} submitted successfully! '

@@ -13,12 +13,15 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from appointments import views as appointment_views
+from core import views as core_views
 from inventory import views as inventory_views
 from requisitions import api as requisition_api
 
 urlpatterns = [
     path('api/deliveries/<int:pk>/confirm/', requisition_api.confirm_delivery, name='api_confirm_delivery'),
     path('admin/', admin.site.urls),
+    path('audit-log/', core_views.audit_log_view, name='root_audit_log'),
+    path('api/audit-logs/', core_views.audit_log_view, name='api_audit_logs'),
     path('', include('core.urls', namespace='core')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('donors/', include('donors.urls', namespace='donors')),

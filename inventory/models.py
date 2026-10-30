@@ -558,6 +558,21 @@ class BloodUnit(models.Model):
                     changed_by=actor, actor_label=actor_label, changed_at=now,
                     reason=reason or ('Collection recorded.' if old is None else 'Status changed.'),
                 )
+                from core.audit import record_audit_event
+                record_audit_event(
+                    action='unit_created' if old is None else 'unit_status_changed',
+                    actor=actor,
+                    actor_label=actor_label,
+                    target_type='blood_unit',
+                    target_id=self.bag_id,
+                    details={
+                        'previous_status': old['status'] if old else '',
+                        'new_status': self.status,
+                        'reason': reason or ('Collection recorded.' if old is None else 'Status changed.'),
+                        'blood_group': self.blood_group,
+                        'component_type': self.component_type,
+                    },
+                )
         self.__dict__.pop('_status_actor', None)
         self.__dict__.pop('_status_reason', None)
 
