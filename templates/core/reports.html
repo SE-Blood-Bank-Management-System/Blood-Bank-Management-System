@@ -1,0 +1,553 @@
+{% extends 'base.html' %}
+{% block title %}System Reports &amp; CSV Analytics - BBMS{% endblock %}
+{% block content %}
+<div class="container py-3">
+  {# Header #}
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold mb-1 d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-line-fill text-danger"></i>
+        System Reports &amp; Analytics
+      </h2>
+      <p class="text-muted mb-0 small">
+        Administrative inventory stock matrices, donation activity, and requisition fulfilment tracking (SRS BBMS-F-064 to BBMS-F-066).
+      </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-dark px-3 py-2"><i class="bi bi-shield-lock me-1"></i>Administrator Privileged</span>
+      <a href="{% url 'core:reports_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-clockwise me-1"></i>Reset Filters
+      </a>
+    </div>
+  </div>
+
+  {# Filter Form Card #}
+  <div class="card mb-4 border-0 shadow-sm bg-light">
+    <div class="card-body py-3">
+      <form method="get" action="{% url 'core:reports_dashboard' %}" class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label for="start_date" class="form-label small fw-bold text-muted mb-1">Start Date</label>
+          <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ start_date }}" required>
+        </div>
+        <div class="col-md-3">
+          <label for="end_date" class="form-label small fw-bold text-muted mb-1">End Date</label>
+          <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" value="{{ end_date }}" required>
+        </div>
+        <div class="col-md-3">
+          <label for="location" class="form-label small fw-bold text-muted mb-1">Storage Location (Stock Tab)</label>
+          <select class="form-select form-select-sm" id="location" name="location">
+            <option value="ALL" {% if not selected_location or selected_location == 'ALL' %}selected{% endif %}>All Locations</option>
+            {% for loc in active_locations %}
+              <option value="{{ loc }}" {% if selected_location == loc %}selected{% endif %}>{{ loc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-danger btn-sm flex-grow-1">
+            <i class="bi bi-funnel-fill me-1"></i>Apply Filter
+          </button>
+          <a href="{% url 'core:reports_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Clear Date Range">
+            <i class="bi bi-x-circle"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Date Validation Error Alert #}
+  {% if error_message %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 mb-4 shadow-sm" role="alert">
+      <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0"></i>
+      <div>
+        <strong>Date Range Validation Error:</strong> {{ error_message }}
+      </div>
+    </div>
+  {% endif %}
+
+  {# Key Executive KPI Summary Cards #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card h-100 border-0 shadow-sm border-start border-success border-4">
+        <div class="card-body py-2 px-3">
+          <div class="text-muted small text-uppercase fw-bold">Available Blood Stock</div>
+          <div class="fs-3 fw-bold text-success">{{ inventory_data.total_available }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-check-circle me-1"></i>Safe, unexpired units (BBMS-F-064)</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card h-100 border-0 shadow-sm border-start border-danger border-4">
+        <div class="card-body py-2 px-3">
+          <div class="text-muted small text-uppercase fw-bold">Donations in Period</div>
+          <div class="fs-3 fw-bold text-danger">{{ donations_data.total_donations|default:"0" }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-droplet me-1"></i>Original collections (BBMS-F-065)</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card h-100 border-0 shadow-sm border-start border-primary border-4">
+        <div class="card-body py-2 px-3">
+          <div class="text-muted small text-uppercase fw-bold">Requisitions Received</div>
+          <div class="fs-3 fw-bold text-primary">{{ requisitions_data.total_received|default:"0" }}</div>
+          <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-hospital me-1"></i>Hospital orders (BBMS-F-066)</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card h-100 border-0 shadow-sm border-start border-info border-4">
+        <div class="card-body py-2 px-3">
+          <div class="text-muted small text-uppercase fw-bold">Fulfilment Rate</div>
+          <div class="fs-3 fw-bold text-info">{{ requisitions_data.fulfilment_rate|default:"0.0" }}%</div>
+          <div class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-send-check me-1"></i>{{ requisitions_data.total_fulfilled|default:"0" }} Fulfilled, {{ requisitions_data.total_partially_fulfilled|default:"0" }} Partial</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Tabs Container #}
+  <ul class="nav nav-pills mb-3 border-bottom pb-2 gap-1" id="reportTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active fw-semibold" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory-pane" type="button" role="tab" aria-controls="inventory-pane" aria-selected="true">
+        <i class="bi bi-box-seam me-1"></i>1. Inventory Stock (BBMS-F-064)
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link fw-semibold" id="donations-tab" data-bs-toggle="tab" data-bs-target="#donations-pane" type="button" role="tab" aria-controls="donations-pane" aria-selected="false">
+        <i class="bi bi-heart-pulse-fill me-1"></i>2. Donation Activity (BBMS-F-065)
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link fw-semibold" id="requisitions-tab" data-bs-toggle="tab" data-bs-target="#requisitions-pane" type="button" role="tab" aria-controls="requisitions-pane" aria-selected="false">
+        <i class="bi bi-clipboard2-check-fill me-1"></i>3. Requisition &amp; Fulfilment (BBMS-F-066)
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="reportTabsContent">
+    {# ============================================================== #}
+    {# TAB 1: INVENTORY STOCK REPORT (BBMS-F-064)                    #}
+    {# ============================================================== #}
+    <div class="tab-pane fade show active" id="inventory-pane" role="tabpanel" aria-labelledby="inventory-tab">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+          <h5 class="fw-bold mb-0">Current Blood Stock Breakdown</h5>
+          <small class="text-muted">Follows safe availability rules: Quarantined, Discarded, and Expired units strictly excluded.</small>
+        </div>
+        <div>
+          <a href="{% url 'core:export_inventory_csv' %}{% if selected_location %}?location={{ selected_location }}{% endif %}" class="btn btn-outline-success btn-sm shadow-sm">
+            <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i>Download Inventory Stock CSV
+          </a>
+        </div>
+      </div>
+
+      {# Status Breakdown Metric Cards #}
+      <div class="row g-2 mb-3">
+        <div class="col-md-3 col-6">
+          <div class="p-2 border rounded bg-white text-center">
+            <div class="small text-muted">Safe Available</div>
+            <div class="fw-bold text-success fs-5">{{ inventory_data.total_available }}</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 border rounded bg-white text-center">
+            <div class="small text-muted">Quarantined (Excluded)</div>
+            <div class="fw-bold text-warning fs-5">{{ inventory_data.total_quarantined }}</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 border rounded bg-white text-center">
+            <div class="small text-muted">Discarded (Excluded)</div>
+            <div class="fw-bold text-danger fs-5">{{ inventory_data.total_discarded }}</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 border rounded bg-white text-center">
+            <div class="small text-muted">Expiring Soon (&le; 7d)</div>
+            <div class="fw-bold text-danger fs-5">{{ inventory_data.expiring_soon_count }}</div>
+          </div>
+        </div>
+      </div>
+
+      {# Table 1: Stock by Blood Group & Component #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-2 fw-bold text-dark border-bottom">
+          <i class="bi bi-grid-3x3 me-1 text-primary"></i>Available Stock by ABO/Rh Group and Component Type
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Blood Group</th>
+                <th class="text-end">Whole Blood</th>
+                <th class="text-end">Red Blood Cells</th>
+                <th class="text-end">Platelets</th>
+                <th class="text-end">Fresh Frozen Plasma</th>
+                <th class="text-end fw-bold">Total Units</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in inventory_data.stock_matrix %}
+                <tr>
+                  <td><span class="badge bg-danger px-2 py-1">{{ row.blood_group }}</span></td>
+                  <td class="text-end">{{ row.whole_blood }}</td>
+                  <td class="text-end">{{ row.rbc }}</td>
+                  <td class="text-end">{{ row.platelets }}</td>
+                  <td class="text-end">{{ row.plasma }}</td>
+                  <td class="text-end fw-bold">{{ row.total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-3">No inventory units currently available.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-bold">
+              <tr>
+                <td>GRAND TOTAL</td>
+                <td class="text-end">{{ inventory_data.grand_component_totals.whole_blood }}</td>
+                <td class="text-end">{{ inventory_data.grand_component_totals.rbc }}</td>
+                <td class="text-end">{{ inventory_data.grand_component_totals.platelets }}</td>
+                <td class="text-end">{{ inventory_data.grand_component_totals.plasma }}</td>
+                <td class="text-end text-success">{{ inventory_data.grand_component_totals.total }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {# Table 2: Stock by Storage Location #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-2 fw-bold text-dark border-bottom">
+          <i class="bi bi-geo-alt-fill me-1 text-danger"></i>Available Stock by Storage Facility Location
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Facility / Storage Location</th>
+                {% for item in inventory_data.location_matrix.0.group_counts %}
+                  <th class="text-end">{{ item.blood_group }}</th>
+                {% empty %}
+                  <th class="text-end">A+</th><th class="text-end">A-</th>
+                  <th class="text-end">B+</th><th class="text-end">B-</th>
+                  <th class="text-end">AB+</th><th class="text-end">AB-</th>
+                  <th class="text-end">O+</th><th class="text-end">O-</th>
+                {% endfor %}
+                <th class="text-end fw-bold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for loc in inventory_data.location_matrix %}
+                <tr>
+                  <td class="fw-semibold">{{ loc.location }}</td>
+                  {% for gc in loc.group_counts %}
+                    <td class="text-end">{{ gc.count }}</td>
+                  {% endfor %}
+                  <td class="text-end fw-bold text-primary">{{ loc.total }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="10" class="text-center text-muted py-3">No storage locations found.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light fw-bold">
+              <tr>
+                <td>TOTAL</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.A_POS|default:inventory_data.loc_grand_totals.A_plus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.A_NEG|default:inventory_data.loc_grand_totals.A_minus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.B_POS|default:inventory_data.loc_grand_totals.B_plus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.B_NEG|default:inventory_data.loc_grand_totals.B_minus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.AB_POS|default:inventory_data.loc_grand_totals.AB_plus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.AB_NEG|default:inventory_data.loc_grand_totals.AB_minus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.O_POS|default:inventory_data.loc_grand_totals.O_plus|default:0 }}</td>
+                <td class="text-end">{{ inventory_data.loc_grand_totals.O_NEG|default:inventory_data.loc_grand_totals.O_minus|default:0 }}</td>
+                <td class="text-end text-success">{{ inventory_data.loc_grand_totals.all }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {# ============================================================== #}
+    {# TAB 2: DONATION ACTIVITY REPORT (BBMS-F-065)                  #}
+    {# ============================================================== #}
+    <div class="tab-pane fade" id="donations-pane" role="tabpanel" aria-labelledby="donations-tab">
+      {% if donations_data %}
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="fw-bold mb-0">Donation &amp; Collection Activity</h5>
+            <small class="text-muted">Filtered Date Range: <strong>{{ donations_data.start_date }}</strong> to <strong>{{ donations_data.end_date }}</strong></small>
+          </div>
+          <div>
+            <a href="{% url 'core:export_donations_csv' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-outline-danger btn-sm shadow-sm">
+              <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i>Download Donation Activity CSV
+            </a>
+          </div>
+        </div>
+
+        {# Rule Compliance Banner #}
+        <div class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+          <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+          <div>
+            <strong>SRS BBMS-F-065 Accounting Guarantee:</strong> Separated child components ({{ donations_data.derived_components_count }} units derived) are linked to parent collections and are <strong>strictly excluded</strong> from new donation counts.
+          </div>
+        </div>
+
+        {# Activity Metrics #}
+        <div class="row g-2 mb-3">
+          <div class="col-md-3 col-6">
+            <div class="p-3 border rounded bg-white text-center shadow-sm">
+              <div class="text-muted small text-uppercase fw-bold">Total Donations</div>
+              <div class="fs-4 fw-bold text-danger">{{ donations_data.total_donations }}</div>
+              <div class="text-muted small">Primary donor sessions</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 border rounded bg-white text-center shadow-sm">
+              <div class="text-muted small text-uppercase fw-bold">Primary Units Collected</div>
+              <div class="fs-4 fw-bold text-primary">{{ donations_data.collected_units }}</div>
+              <div class="text-muted small">Whole Blood / Apheresis</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 border rounded bg-white text-center shadow-sm">
+              <div class="text-muted small text-uppercase fw-bold">Derived Child Components</div>
+              <div class="fs-4 fw-bold text-secondary">{{ donations_data.derived_components_count }}</div>
+              <div class="text-muted small">Separated (Not new donations)</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-6">
+            <div class="p-3 border rounded bg-white text-center shadow-sm">
+              <div class="text-muted small text-uppercase fw-bold">Discarded Units</div>
+              <div class="fs-4 fw-bold text-warning">{{ donations_data.discarded_units }}</div>
+              <div class="text-muted small">Failed serology / expired</div>
+            </div>
+          </div>
+        </div>
+
+        {# Blood Group Breakdown Table #}
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white py-2 fw-bold text-dark border-bottom">
+                <i class="bi bi-pie-chart-fill me-1 text-danger"></i>Donations &amp; Discards by Blood Group
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Blood Group</th>
+                      <th class="text-end">Donations Collected</th>
+                      <th class="text-end">Units Discarded</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in donations_data.donations_by_group %}
+                      <tr>
+                        <td><span class="badge bg-danger">{{ row.blood_group }}</span></td>
+                        <td class="text-end fw-semibold">{{ row.count }}</td>
+                        <td class="text-end text-muted">
+                          {% for d in donations_data.discarded_by_group %}
+                            {% if d.blood_group == row.blood_group %}{{ d.count }}{% endif %}
+                          {% endfor %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white py-2 fw-bold text-dark border-bottom">
+                <i class="bi bi-trash-fill me-1 text-danger"></i>Discarded Units Log in Period
+              </div>
+              <div class="table-responsive" style="max-height: 250px;">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Bag ID</th>
+                      <th>Group</th>
+                      <th>Component</th>
+                      <th>Audit Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in donations_data.discarded_details %}
+                      <tr>
+                        <td class="small fw-semibold text-danger">{{ item.bag_id }}</td>
+                        <td><span class="badge bg-secondary">{{ item.blood_group }}</span></td>
+                        <td class="small">{{ item.component_type }}</td>
+                        <td class="small text-muted" style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.reason }}">{{ item.reason }}</td>
+                      </tr>
+                    {% empty %}
+                      <tr><td colspan="4" class="text-center text-muted py-3">Zero discarded units in this period.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# Collections Table (Privacy Safe: Excludes Donor PII) #}
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-2 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-collection-fill me-1 text-primary"></i>Recent Primary Collections in Range</span>
+            <span class="badge bg-light text-muted border">Privacy Protected: No Donor PII Excluded</span>
+          </div>
+          <div class="table-responsive" style="max-height: 350px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Bag ID</th>
+                  <th>Blood Group</th>
+                  <th>Component</th>
+                  <th>Volume (ml)</th>
+                  <th>Facility</th>
+                  <th>Collection Date</th>
+                  <th>Current Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in donations_data.collection_rows %}
+                  <tr>
+                    <td class="fw-semibold text-primary small">{{ row.bag_id }}</td>
+                    <td><span class="badge bg-danger">{{ row.blood_group }}</span></td>
+                    <td class="small">{{ row.component_type }}</td>
+                    <td>{{ row.volume_ml }}</td>
+                    <td class="small text-muted">{{ row.location }}</td>
+                    <td class="small text-muted">{{ row.collection_date }}</td>
+                    <td><span class="badge bg-secondary small">{{ row.status }}</span></td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="7" class="text-center text-muted py-3">No collections recorded in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-warning">Please specify a valid date range to inspect donation activity.</div>
+      {% endif %}
+    </div>
+
+    {# ============================================================== #}
+    {# TAB 3: REQUISITIONS & FULFILMENT REPORT (BBMS-F-066)           #}
+    {# ============================================================== #}
+    <div class="tab-pane fade" id="requisitions-pane" role="tabpanel" aria-labelledby="requisitions-tab">
+      {% if requisitions_data %}
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="fw-bold mb-0">Hospital Requisition &amp; Fulfilment Accounting</h5>
+            <small class="text-muted">Filtered Date Range: <strong>{{ requisitions_data.start_date }}</strong> to <strong>{{ requisitions_data.end_date }}</strong></small>
+          </div>
+          <div>
+            <a href="{% url 'core:export_requisitions_csv' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-outline-primary btn-sm shadow-sm">
+              <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i>Download Requisition Report CSV
+            </a>
+          </div>
+        </div>
+
+        {# Status KPI Grid #}
+        <div class="row g-2 mb-3">
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Received</div>
+              <div class="fw-bold text-dark fs-5">{{ requisitions_data.total_received }}</div>
+            </div>
+          </div>
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Fulfilled</div>
+              <div class="fw-bold text-success fs-5">{{ requisitions_data.total_fulfilled }}</div>
+            </div>
+          </div>
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Partially Fulfilled</div>
+              <div class="fw-bold text-info fs-5">{{ requisitions_data.total_partially_fulfilled }}</div>
+            </div>
+          </div>
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Rejected</div>
+              <div class="fw-bold text-danger fs-5">{{ requisitions_data.total_rejected }}</div>
+            </div>
+          </div>
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Dispatched Bags</div>
+              <div class="fw-bold text-primary fs-5">{{ requisitions_data.total_units_dispatched }}</div>
+            </div>
+          </div>
+          <div class="col-md-2 col-4">
+            <div class="p-2 border rounded bg-white text-center">
+              <div class="small text-muted">Manifests Issued</div>
+              <div class="fw-bold text-secondary fs-5">{{ requisitions_data.manifests_count }}</div>
+            </div>
+          </div>
+        </div>
+
+        {# Requisition Records Table #}
+        <div class="card border-0 shadow-sm">
+          <div class="card-header bg-white py-2 fw-bold text-dark border-bottom">
+            <i class="bi bi-list-check me-1 text-primary"></i>Requisition Submissions &amp; Fulfilment Status
+          </div>
+          <div class="table-responsive" style="max-height: 400px;">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Requisition ID</th>
+                  <th>Hospital</th>
+                  <th>Group</th>
+                  <th>Component</th>
+                  <th class="text-end">Requested</th>
+                  <th class="text-end">Dispatched</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th>Required By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in requisitions_data.requisition_rows %}
+                  <tr>
+                    <td class="fw-semibold small text-primary">{{ row.requisition_id }}</td>
+                    <td class="small">{{ row.hospital }}</td>
+                    <td><span class="badge bg-danger">{{ row.blood_group }}</span></td>
+                    <td class="small">{{ row.component_type }}</td>
+                    <td class="text-end fw-bold">{{ row.quantity }}</td>
+                    <td class="text-end fw-bold {% if row.dispatched_quantity >= row.quantity %}text-success{% else %}text-info{% endif %}">
+                      {{ row.dispatched_quantity }}
+                    </td>
+                    <td>
+                      {% if row.status == 'Fulfilled' %}
+                        <span class="badge bg-success">Fulfilled</span>
+                      {% elif row.status == 'Partially Fulfilled' %}
+                        <span class="badge bg-info text-dark">Partially Fulfilled</span>
+                      {% elif row.status == 'Approved' %}
+                        <span class="badge bg-primary">Approved</span>
+                      {% elif row.status == 'Rejected' %}
+                        <span class="badge bg-danger" title="{{ row.rejection_reason }}">Rejected</span>
+                      {% else %}
+                        <span class="badge bg-warning text-dark">Pending</span>
+                      {% endif %}
+                      {% if row.is_stat %}<span class="badge bg-danger ms-1">STAT</span>{% endif %}
+                    </td>
+                    <td class="small text-muted">{{ row.created_at }}</td>
+                    <td class="small text-muted">{{ row.required_by }}</td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="9" class="text-center text-muted py-3">No requisitions recorded in this date range.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-warning">Please specify a valid date range to inspect requisition accounting.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

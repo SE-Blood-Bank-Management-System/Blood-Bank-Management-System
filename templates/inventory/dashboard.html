@@ -13,6 +13,11 @@
       </p>
     </div>
     <div class="d-flex gap-2">
+      {% if user.role == 'ADMIN' or user.is_superuser %}
+        <a href="{% url 'core:export_inventory_csv' %}" class="btn btn-outline-success">
+          <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i>Export CSV
+        </a>
+      {% endif %}
       <a href="{% url 'inventory:record_collection' %}" class="btn btn-danger">
         <i class="bi bi-plus-circle me-1"></i>Record Collection
       </a>
