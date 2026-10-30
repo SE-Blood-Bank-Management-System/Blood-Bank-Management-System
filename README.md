@@ -331,4 +331,4 @@ python manage.py test core.test_central_audit
 python manage.py test core.test_security_deployment
 python manage.py verify_audit_integrity
 ```
-See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md) and [central tamper-evident audit log guide](docs/central-audit-log.md).
+See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md), [central tamper-evident audit log guide](docs/central-audit-log.md), and [system reports & CSV analytics guide](docs/reports-and-csv-analytics.md).

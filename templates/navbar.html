@@ -104,6 +104,11 @@
                 <i class="bi bi-shield-lock me-1"></i>Audit Log
               </a>
             </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'core:reports_dashboard' %}">
+                <i class="bi bi-bar-chart-fill me-1"></i>Reports
+              </a>
+            </li>
 
           {% elif user.role == 'HOSPITAL' %}
             {# Hospital User Navigation #}
