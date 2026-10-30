@@ -118,7 +118,7 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-F-056–F-057** | Hospital delivery confirmation | **Implemented (Issue #32)** | Owned receipt, receiver/time and atomic Delivered transition; see docs/hospital-delivery.md |
 | **BBMS-F-058–F-059** | Tamper-evident audit logging & administrator audit log viewer | **Implemented (Issue #47)** | Central append-only audit service with SHA-256 hash chaining, CLI verification command, paginated admin viewer UI at /audit-log/, and REST API. See [docs/central-audit-log.md](central-audit-log.md) |
 | **BBMS-F-060–F-063** | Admin user/role management & hospital approval action | **Implemented** | Admin user management and role guards implemented |
-| **BBMS-F-064–F-066** | System reports & CSV exports | **Deferred (Sprint 2)** | Scheduled for Sprint 2 Reporting module |
+| **BBMS-F-064–F-066** | System reports & CSV exports | **Implemented (Issue #42)** | Inventory stock matrix, date-range donation activity (excluding separated components), and requisition fulfilment accounting with formula-safe CSV exports. See [docs/reports-and-csv-analytics.md](reports-and-csv-analytics.md) |
 | **BBMS-F-067–F-068** | Public blood availability lookup without auth | **Implemented** | `core.views.public_availability`, privacy-compliant view |
 | **BBMS-SR-001** | Mandatory authentication before role-specific functions | **Implemented** | Server-side `@role_required` and `@login_required` decorators |
 | **BBMS-SR-002** | Salted, one-way password hashing (PBKDF2/bcrypt) | **Implemented** | Django password hashers with high work factor |
@@ -236,7 +236,12 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: Medium
 - **Description**: Administrators must be able to export current inventory levels, donation activity reports, and requisition fulfillment rates as downloadable CSV files.
 - **Sprint 1 Baseline**: Live inventory stock matrix exists in dashboard.
-- **Sprint 2 Target**: Implement CSV streaming views using Python's `csv` module.
+- **Sprint 2 Implementation (#42)**: **Resolved & Verified**. Implemented administrative reporting services in `core/reports.py` and views in `core/views.py`. Features include:
+  1. *Safe Inventory Stock Matrix (BBMS-F-064)*: Reuses `get_inventory_counts()` safe availability rules; Quarantined, Discarded, Expired, and Dispatched units strictly excluded.
+  2. *Donation Activity by Date Range (BBMS-F-065)*: Tracks primary donations, collected units, discarded units, and enforces that separated child components are not counted as new donations.
+  3. *Requisition Fulfilment Accounting (BBMS-F-066)*: Tracks received, fulfilled, partially fulfilled, rejected totals and cumulative units dispatched.
+  4. *Security & Privacy (BBMS-SR-003, BBMS-SR-005)*: Strict `@role_required(User.Role.ADMIN)` enforcement, spreadsheet formula injection neutralization (`=, +, -, @, \t, \r`), and exclusion of donor PII.
+  5. *Verified by `TC-RPT-01` and `TC-SEC-03`* (21 automated tests in `core/test_reports.py`). See [documentation](reports-and-csv-analytics.md).
 
 #### DEF-008: Admin Hospital Registration Approval Action UI (SRS BBMS-F-042, BBMS-F-062)
 - **Assigned Owner**: Uttam (PES1UG24CS697)
