@@ -128,7 +128,7 @@ def audit_log_view(request):
     # Pagination
     try:
         page_size = int(request.GET.get('page_size', 25))
-        page_size = max(5, min(page_size, 100))
+        page_size = max(1, min(page_size, 100))
     except (ValueError, TypeError):
         page_size = 25
 
