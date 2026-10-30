@@ -78,11 +78,35 @@ def atomic_mutation(func):
 
 
 def _event(requisition, actor, action, previous_status='', previous_is_stat=None, note=''):
-    return RequisitionEvent.objects.create(
+    event = RequisitionEvent.objects.create(
         requisition=requisition, actor=actor, actor_label=actor.username, action=action,
         previous_status=previous_status, new_status=requisition.status,
         previous_is_stat=previous_is_stat, new_is_stat=requisition.is_stat, note=note,
     )
+    from core.audit import record_audit_event
+    audit_action = (
+        'requisition_created'
+        if action == RequisitionEvent.Action.SUBMITTED
+        else 'requisition_status_changed'
+    )
+    record_audit_event(
+        action=audit_action,
+        actor=actor,
+        actor_label=actor.username,
+        target_type='requisition',
+        target_id=requisition.requisition_id,
+        details={
+            'requisition_action': str(action),
+            'previous_status': previous_status,
+            'new_status': requisition.status,
+            'is_stat': requisition.is_stat,
+            'blood_group': requisition.blood_group,
+            'component_type': requisition.component_type,
+            'quantity': requisition.quantity,
+            'note': note,
+        },
+    )
+    return event
 
 
 def _check_version(requisition, expected_version):
