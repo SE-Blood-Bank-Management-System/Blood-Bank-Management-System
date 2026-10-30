@@ -22,6 +22,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('audit-log/', core_views.audit_log_view, name='root_audit_log'),
     path('api/audit-logs/', core_views.audit_log_view, name='api_audit_logs'),
+    path('reports/', core_views.reports_dashboard, name='root_reports'),
+    path('api/reports/', core_views.api_reports, name='api_reports'),
     path('', include('core.urls', namespace='core')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('donors/', include('donors.urls', namespace='donors')),

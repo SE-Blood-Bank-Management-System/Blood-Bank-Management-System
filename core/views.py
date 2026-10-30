@@ -5,13 +5,25 @@ SRS: Section 2.1, 3.1, 4.22 (BBMS-F-067, BBMS-F-068), Section 4.19 (BBMS-F-058, 
 from datetime import datetime
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponseNotAllowed, JsonResponse
+from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
+from accounts.models import User
 from accounts.rbac import _is_api_request, role_required
 from core.audit import verify_audit_log_integrity
 from core.constants import VALID_BLOOD_GROUPS
 from core.models import SecurityAuditEvent
+from core.reports import (
+    generate_donations_csv,
+    generate_inventory_csv,
+    generate_requisitions_csv,
+    get_donation_activity_report_data,
+    get_inventory_report_data,
+    get_requisition_report_data,
+    parse_and_validate_date_range,
+)
 from inventory.models import BloodUnit
+from inventory.services import get_active_locations
 
 
 def home(request):
@@ -223,3 +235,165 @@ def audit_log_view(request):
         'severity_choices': SecurityAuditEvent.Severity.choices,
     }
     return render(request, 'core/audit_log.html', context)
+
+
+# ==============================================================================
+# Administrative Reports & CSV Analytics (BBMS-F-064 to BBMS-F-066, TC-RPT-01, TC-SEC-03)
+# ==============================================================================
+
+@role_required(User.Role.ADMIN)
+def reports_dashboard(request):
+    """
+    Administrative Reports & Analytics Dashboard.
+    Provides visual summaries and CSV downloads for:
+    - 1. Available Stock Matrix (BBMS-F-064)
+    - 2. Donation Activity by Date Range (BBMS-F-065)
+    - 3. Requisition & Fulfilment Rates (BBMS-F-066)
+
+    SRS References: BBMS-F-064, BBMS-F-065, BBMS-F-066, BBMS-SR-003, BBMS-SR-005.
+    """
+    start_date_str = request.GET.get('start_date', '')
+    end_date_str = request.GET.get('end_date', '')
+    selected_location = request.GET.get('location', '')
+    active_tab = request.GET.get('tab', 'overview')
+
+    start_date, end_date, error_message = parse_and_validate_date_range(start_date_str, end_date_str)
+
+    active_locations = get_active_locations()
+
+    inventory_data = get_inventory_report_data(location=selected_location if selected_location != 'ALL' else None)
+
+    if error_message:
+        donations_data = None
+        requisitions_data = None
+    else:
+        donations_data = get_donation_activity_report_data(start_date, end_date)
+        requisitions_data = get_requisition_report_data(start_date, end_date)
+
+    context = {
+        'title': 'Reports & CSV Analytics',
+        'start_date': start_date.strftime('%Y-%m-%d') if start_date else '',
+        'end_date': end_date.strftime('%Y-%m-%d') if end_date else '',
+        'selected_location': selected_location,
+        'active_locations': active_locations,
+        'active_tab': active_tab,
+        'error_message': error_message,
+        'inventory_data': inventory_data,
+        'donations_data': donations_data,
+        'requisitions_data': requisitions_data,
+    }
+    return render(request, 'core/reports.html', context)
+
+
+@role_required(User.Role.ADMIN)
+def export_inventory_csv(request):
+    """
+    Downloads inventory stock levels as a formula-safe CSV file.
+    SRS BBMS-F-064, BBMS-SR-003, BBMS-SR-005.
+    """
+    location = request.GET.get('location')
+    csv_text = generate_inventory_csv(location=location if location != 'ALL' else None)
+
+    today_str = timezone.localdate().strftime('%Y%m%d')
+    filename = f"bbms_inventory_stock_{today_str}.csv"
+
+    response = HttpResponse(csv_text, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@role_required(User.Role.ADMIN)
+def export_donations_csv(request):
+    """
+    Downloads donation activity report as a formula-safe CSV file.
+    SRS BBMS-F-065, BBMS-SR-003, BBMS-SR-005.
+    """
+    start_date_str = request.GET.get('start_date', '')
+    end_date_str = request.GET.get('end_date', '')
+
+    start_date, end_date, error_message = parse_and_validate_date_range(start_date_str, end_date_str)
+    if error_message:
+        return HttpResponse(f"Invalid date range: {error_message}", status=400, content_type='text/plain')
+
+    csv_text = generate_donations_csv(start_date, end_date)
+    filename = f"bbms_donations_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
+
+    response = HttpResponse(csv_text, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@role_required(User.Role.ADMIN)
+def export_requisitions_csv(request):
+    """
+    Downloads requisition fulfilment report as a formula-safe CSV file.
+    SRS BBMS-F-066, BBMS-SR-003, BBMS-SR-005.
+    """
+    start_date_str = request.GET.get('start_date', '')
+    end_date_str = request.GET.get('end_date', '')
+
+    start_date, end_date, error_message = parse_and_validate_date_range(start_date_str, end_date_str)
+    if error_message:
+        return HttpResponse(f"Invalid date range: {error_message}", status=400, content_type='text/plain')
+
+    csv_text = generate_requisitions_csv(start_date, end_date)
+    filename = f"bbms_requisitions_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
+
+    response = HttpResponse(csv_text, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@role_required(User.Role.ADMIN)
+def api_reports(request):
+    """
+    REST API endpoint for reports data (JSON format).
+    Supports ?type=inventory|donations|requisitions|all&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+    """
+    report_type = request.GET.get('type', 'all')
+    start_date_str = request.GET.get('start_date', '')
+    end_date_str = request.GET.get('end_date', '')
+    location = request.GET.get('location', '')
+
+    start_date, end_date, error_message = parse_and_validate_date_range(start_date_str, end_date_str)
+    if error_message:
+        return JsonResponse({'error': error_message}, status=400)
+
+    payload = {}
+    if report_type in ('all', 'inventory'):
+        payload['inventory'] = get_inventory_report_data(location=location if location != 'ALL' else None)
+
+    if report_type in ('all', 'donations'):
+        donations = get_donation_activity_report_data(start_date, end_date)
+        # JSON-serializable copy
+        payload['donations'] = {
+            'start_date': str(donations['start_date']),
+            'end_date': str(donations['end_date']),
+            'total_donations': donations['total_donations'],
+            'collected_units': donations['collected_units'],
+            'derived_components_count': donations['derived_components_count'],
+            'discarded_units': donations['discarded_units'],
+            'unique_donors_count': donations['unique_donors_count'],
+            'donations_by_group': donations['donations_by_group'],
+            'discarded_by_group': donations['discarded_by_group'],
+        }
+
+    if report_type in ('all', 'requisitions'):
+        reqs = get_requisition_report_data(start_date, end_date)
+        payload['requisitions'] = {
+            'start_date': str(reqs['start_date']),
+            'end_date': str(reqs['end_date']),
+            'total_received': reqs['total_received'],
+            'total_fulfilled': reqs['total_fulfilled'],
+            'total_partially_fulfilled': reqs['total_partially_fulfilled'],
+            'total_rejected': reqs['total_rejected'],
+            'total_pending': reqs['total_pending'],
+            'total_approved': reqs['total_approved'],
+            'total_units_requested': reqs['total_units_requested'],
+            'total_units_dispatched': reqs['total_units_dispatched'],
+            'manifests_count': reqs['manifests_count'],
+            'fulfilment_rate': reqs['fulfilment_rate'],
+            'req_by_group': reqs['req_by_group'],
+        }
+
+    return JsonResponse(payload)
