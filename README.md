@@ -20,7 +20,8 @@ https://github.com/user-attachments/assets/d119a3fc-9cf0-4850-a538-b834794d244c
 
 ## Sprint 2 final demo and acceptance record
 
-[Watch/download the two-minute Sprint 2 demo](demo/BBMS_Sprint2_Demo.mp4).
+https://github.com/user-attachments/assets/e5db3ba6-dc65-450c-82a8-86e5d1f74bc3
+
 Recorded from the running app with synthetic team-name accounts, visible dropdowns,
 grey click indicators, no cursor/audio, and one constant 2× playback rate.
 The four-minute recording executes hospital request → approval → cross-match →
