@@ -1,0 +1,14 @@
+[run]
+source = accounts,appointments,core,donors,inventory,requisitions
+omit =
+    */migrations/*
+    */tests/*
+    */test*.py
+    */admin.py
+    */apps.py
+    */urls.py
+    */management/*
+
+[report]
+show_missing = True
+fail_under = 60
