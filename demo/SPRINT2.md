@@ -48,6 +48,7 @@ with `NODE_PATH`. Set `BBMS_BROWSER_PATH` to an installed Chromium-family browse
 executable if the default Windows Brave path is not applicable. Run:
 
 ```text
+python -m pip install -r demo/requirements.txt
 node demo/record_sprint2.cjs ../sprint2-recording
 python demo/encode_sprint2.py --recording ../sprint2-recording --ffmpeg /path/to/ffmpeg --output demo/BBMS_Sprint2_Demo.mp4 --normal-output ../BBMS_Sprint2_Normal_Speed.mp4
 ```
