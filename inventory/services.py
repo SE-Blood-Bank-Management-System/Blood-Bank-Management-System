@@ -14,9 +14,8 @@ from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from core.constants import (
-    BloodGroup, VALID_BLOOD_GROUPS, get_compatible_donor_groups, is_blood_compatible
-)
+from core.constants import BloodGroup, VALID_BLOOD_GROUPS
+from requisitions.compatibility import get_compatible_donor_groups, is_transfusion_compatible
 from requisitions.models import Requisition
 from requisitions.services import require_staff
 from .models import (
@@ -263,7 +262,7 @@ def get_fefo_allocation_suggestions(requisition, limit=None):
         return []
 
     now = timezone.now()
-    compatible_groups = get_compatible_donor_groups(requisition.blood_group)
+    compatible_groups = get_compatible_donor_groups(requisition.blood_group, requisition.component_type)
 
     # Base queryset for available, unexpired units of the correct component
     qs = BloodUnit.objects.filter(
@@ -308,7 +307,7 @@ def get_available_units_for_requisition(requisition):
         allocations__status=AllocationStatus.RESERVED
     ).order_by('expiry_date', 'collection_date', 'bag_id').prefetch_related('serology_tests')
 
-    compatible_groups = set(get_compatible_donor_groups(requisition.blood_group))
+    compatible_groups = set(get_compatible_donor_groups(requisition.blood_group, requisition.component_type))
     units_info = []
     for unit in qs:
         if unit.has_passed_serology:
@@ -396,7 +395,9 @@ def allocate_units_to_requisition(*, requisition_pk, unit_ids, actor, override_r
                     )
 
                 # Check compatibility
-                compatible = is_blood_compatible(unit.blood_group, requisition.blood_group)
+                compatible = is_transfusion_compatible(
+                    unit.blood_group, requisition.blood_group, requisition.component_type,
+                )
                 if not compatible:
                     if not override_reason:
                         raise ValidationError(

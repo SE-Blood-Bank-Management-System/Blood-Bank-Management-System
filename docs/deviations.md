@@ -2,8 +2,8 @@
 
 **Document ID**: BBMS-DEV-001  
 **Project**: Blood Bank Management System (BBMS) &bull; Software Engineering Mini-Project  
-**Version**: 1.0  
-**Date**: 24 October 2026  
+**Version**: 1.1
+**Date**: 1 November 2026
 **Authors**: Team T9  
 - Uttam (PES1UG24CS697) &bull; *Lead & Architecture*  
 - Abhinav K (PES1UG24CS701) &bull; *Testing & Workflows*  
@@ -11,6 +11,17 @@
 - Navaneeth Tanuboddi (PES1UG24CS709) &bull; *Security & Integrations*  
 
 ---
+
+## Current Sprint 2 evidence
+
+The Sprint 1 narrative and original test counts below are historical. Current
+acceptance is governed by [the Sprint 2 test/NFR record](sprint2/acceptance.md),
+[the 91-requirement RTM](sprint2/requirements-traceability.csv) and
+[the retained interface deviations](sprint2/interfaces.md). Functional integration
+and regression pass in the recorded scope; search performance, missing deployment/
+usability/browser evidence, independent review and owner freeze actions remain
+explicitly open. Do not infer full SRS or deployed TLS compliance from feature
+implementation, a video, or a historical Pass label.
 
 ## 1. Executive Summary
 
@@ -30,7 +41,7 @@ During implementation, several design refinements were made to optimize database
 - **Implemented Architecture**:  
   Demographic and blood donation attributes (`date_of_birth`, `gender`, `blood_group`, `phone`, `address`, `hospital_name`, `license_number`, `contact_person`) were consolidated directly into `accounts.models.User`, subclassing Django's `AbstractUser`.
 - **Rationale & Benefits**:  
-  1. *Elimination of Join Overhead*: Eliminates repetitive `SELECT ... JOIN` queries on every authenticated request, improving response times (sub-50ms execution).  
+  1. *Elimination of Join Overhead*: Eliminates repetitive `SELECT ... JOIN` queries on every authenticated request, reducing profile joins (no sub-50ms acceptance measurement is claimed).
   2. *Atomic Validation*: Ensures that email uniqueness, age validation ($\ge 18$), and role enforcement occur at the root authentication layer before records can be persisted.  
   3. *Elimination of Orphaned Profiles*: Guarantees database integrity without risk of desynchronized `User` vs `DonorProfile` records.  
   4. *Preserved Separation of Concerns*: Donor self-reported blood group on `User` remains strictly isolated from laboratory-confirmed blood group stored on `BloodUnit` (SRS BBMS-F-023).
@@ -47,9 +58,9 @@ During implementation, several design refinements were made to optimize database
 - **SAD v1.0 Specification (Section 4.1)**:  
   Described static database rows manually entered for every daily appointment slot.
 - **Implemented Architecture**:  
-  Implemented an on-demand slot generation engine in `appointments.services.get_or_create_slots_for_date()`. Standard daily slots (`09:00-10:00`, `10:00-11:00`, `11:00-12:00`, `14:00-15:00`, `15:00-16:00`) are automatically instantiated upon calendar lookup or seed generation with database row-level locking (`select_for_update`).
+  Implemented an on-demand slot generation engine in `appointments.services.get_or_create_slots_for_date()`. Standard daily slots (`09:00-10:00`, `10:00-11:00`, `11:00-12:00`, `14:00-15:00`, `15:00-16:00`) are automatically instantiated upon calendar lookup or seed generation inside transactions (`select_for_update` locks rows on supporting databases; SQLite does not implement row-level locks).
 - **Rationale & Benefits**:  
-  Eliminates administrative burden while maintaining strict per-slot capacity limits (`max_capacity=5`) and atomic concurrency protection against double-booking races (SRS BBMS-F-013).
+  Eliminates administrative burden while maintaining strict per-slot capacity limits (`max_capacity=5`) and transactional capacity checks; deployed multi-user concurrency still requires its own verification (SRS BBMS-F-013).
 
 ### 2.4 Session Security & Local Development Cookie Configuration
 - **SAD v1.0 Specification (Section 3.9) & SRS (BBMS-SR-006)**:  
@@ -57,7 +68,7 @@ During implementation, several design refinements were made to optimize database
 - **Implemented Architecture**:  
   Enabled production-secure cookies by default (`SESSION_COOKIE_SECURE = True`, `CSRF_COOKIE_SECURE = True`). Added an explicit environment variable toggle `BBMS_SECURE_COOKIES` defaulting to `1`. Running `BBMS_SECURE_COOKIES=0` allows local demonstration and evaluation over unencrypted HTTP (`http://127.0.0.1:8000`) without modern browsers dropping the session cookies.
 - **Rationale & Benefits**:  
-  Guarantees security in production HTTPS environments while preventing usability barriers during local student evaluations.
+  Supports secure cookies when deployed behind correctly configured HTTPS while preventing usability barriers during local student evaluations.
 
 ### 2.5 Presentation Architecture: Dual UI and REST API
 - **SAD v1.0 Specification (Section 4.3)**:  
@@ -127,8 +138,8 @@ The IEEE Std 830-style SRS defined 68 functional requirements (BBMS-F-001 to BBM
 | **BBMS-SR-005** | Input validation, sanitization, and context-aware HTML encoding | **Implemented** | Django forms validation + auto-escaping in DTL templates |
 | **BBMS-SR-006** | Session security, 30-min idle timeout, and HttpOnly cookies | **Implemented** | `SESSION_COOKIE_AGE = 1800`, sliding window expiry |
 | **BBMS-SR-007** | Brute-force lockout and login rate limiting | **Implemented (Issue #45)** | 15-min lockout after 5 consecutive failed attempts; $\le 10$ req/min sliding-window IP rate limiting; alias normalization |
-| **BBMS-SR-008** | HTTPS/TLS and security audit trail | **Implemented (Issue #45)** | Append-only SecurityAuditEvent, secret scrubbing, timestamped server error logging, HTTPS deployment settings |
-| **BBMS-NF-006** | Secure deployment, HTTPS redirection, HSTS, safe error handling | **Implemented (Issue #45)** | Mandatory SECRET_KEY when DEBUG=False, HSTS headers, secure cookies, generic 404/500 error pages |
+| **BBMS-SR-008** | HTTPS/TLS and security audit trail | **Partially verified (#45/#47/#49)** | Audit and secure-settings tests pass; deployed TLS/certificate not exercised; no unconditional compliance claim |
+| **BBMS-NF-006** | Timestamped unhandled-error logging and stack trace | **Pass automated (#49)** | Real controlled-error request and safe 500 response in core.test_nfr_reliability; HTTPS is tracked separately under SR-008 |
 
 
 ---
@@ -153,14 +164,14 @@ All test cases planned for Sprint 1 have been implemented, executed, and verifie
 | **TC-QNT-01** | Quarantine List & Audit Logging | Elapsed time in quarantine, status log | **Pass** | `python manage.py test inventory.tests` |
 | **TC-SEC-01–07** | Security Controls & RBAC | HTTP 403 rejection, SQLi, XSS, rate limiting | **Pass** | `python manage.py test accounts.tests` |
 | **TC-SEC-07** | Account Lockout & IP Rate Limiting | 15-min lockout after 5 fails, 10 req/min/IP, alias normalization | **Pass** | `python manage.py test accounts.test_lockout_and_rate_limit` (12 tests) |
-| **TC-SEC-08** | Central Audit Trail & Error Logging | Append-only audit records, secret scrubbing, 500 error logging | **Pass** | `python manage.py test accounts.test_security_audit core.test_central_audit` |
+| **TC-SEC-08** | Central Audit Trail & TLS | Audit tests pass; end-to-end deployed TLS not exercised | **Partial / Blocked** | `python manage.py test accounts.test_security_audit core.test_central_audit` |
 | **TC-AUD-01** | Central Audit Trail & Tamper Verification | Shared append audit service, SHA-256 chain verification, admin viewer UI & API, permissions, retention | **Pass** | `python manage.py test core.test_central_audit` (32 tests) |
-| **TC-NF-02** | Secure Deployment & HTTPS Acceptance | DEBUG=False validation, HSTS, secure cookies, generic error pages | **Pass** | `python manage.py test core.test_security_deployment` (6 tests) |
+| **TC-NF-02** | Reliability / Availability | Local reopen and actual error logging pass; scheduled availability evidence absent | **Partial / Blocked** | `python manage.py test core.test_security_deployment` (6 tests) |
 | **TC-SMTP-01** | SMTP Message Delivery Demonstration | Live RFC 5321/5322 delivery over local TCP loopback socket | **Pass** | `python manage.py test accounts.test_smtp_delivery` (1 test) |
 | **TC-E2E-01** | End-to-End Donor Workflow | Reg &rarr; Screening &rarr; Booking &rarr; Collection &rarr; Testing | **Pass** | `python manage.py test core.test_integration_donor_workflow` (4 tests) |
 | **TC-SEED-01** | Demo Seed Data Verification | Idempotency, demo accounts, slots, testing records | **Pass** | `python manage.py test core.test_seed_data` (3 tests) |
 
-*Full Test Suite Execution Summary: 182 passed in ~54s, 0 failures, 0 errors.*
+*Historical Sprint 1 summary: 182 tests. This count is not the current Sprint 2 regression; see sprint2/acceptance.md.*
 
 ---
 
@@ -248,17 +259,24 @@ The remaining capabilities and deferred scope items have been structured into di
 - **Severity**: Low
 - **Description**: Administrators can approve pending hospital accounts (`is_approved=False`) through the standard Django admin; a dedicated one-click staff approval view will be added to the BBMS frontend in Sprint 2.
 - **Sprint 1 Baseline**: Django admin allows setting `is_approved=True`; unapproved hospitals are blocked from login.
-- **Sprint 2 Target**: Add pending hospital review queue to admin navigation.
+- **Retained interface**: Approval remains in Django admin. A separate frontend approval queue was not part of the compact Sprint 2 scope; it is not claimed complete.
 
 #### DEF-009: Automated Password Reset SMTP Email Delivery (SRS BBMS-F-005, BBMS-SR-008)
 - **Assigned Owner**: Uttam (PES1UG24CS697)
 - **Severity**: Low
 - **Description**: Integrate SMTP backend (e.g., Mailpit or console email backend) for single-use, time-limited password reset tokens.
 - **Sprint 1 Baseline**: Passwords can be reset via admin or command line.
-- **Sprint 2 Target**: Configure Django auth password reset views with HTML email templates.
+- **Implemented (#45)**: Time-limited, single-use reset flow and environment-configured SMTP. Local TCP SMTP delivery is exercised by accounts.test_smtp_delivery in the passing regression; external mail-provider delivery is not claimed.
 
 ---
 
-## 6. Conclusion
+## 6. Current acceptance disposition
 
-Sprint 1 successfully delivered a robust, modular, and fully tested core for the Blood Bank Management System. All 182 automated tests pass, zero linting errors exist under `flake8`, and the integrated application is seeded and ready for live demonstration. The architectural refinements documented above have improved system performance and maintainability, while the Sprint 2 work registry establishes clear ownership for remaining project deliverables.
+The integrated Sprint 2 functional workflow is demonstrated by the actual running
+application and automated regression. The final issue adds component-policy
+integration regression, truthful NFR/coverage evidence, retained API differences,
+and the silent two-minute video. The NF-001 local search threshold remains failed;
+full availability, usability/accessibility, browser-version and deployed TLS/RDBMS
+evidence remains unavailable. Independent review, owner merge, protection-rule
+enforcement and the actual final freeze are owner/evaluator actions. See
+[sprint2/acceptance.md](sprint2/acceptance.md) for the complete handoff.

@@ -4,7 +4,7 @@ SRS: Section 2.1, 3.1, 4.22 (BBMS-F-067, BBMS-F-068), Section 4.19 (BBMS-F-058, 
 """
 from datetime import datetime
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -48,11 +48,14 @@ def public_availability(request):
     Accessible without authentication; excludes donor/hospital PII.
     Calculates live counts from available blood units across the eight ABO/Rh blood groups.
     """
-    available_units = BloodUnit.objects.available()
+    # Aggregate all eight groups once instead of issuing a COUNT per group.
+    counts = dict(BloodUnit.objects.available().values('blood_group').annotate(
+        total=Count('pk'),
+    ).values_list('blood_group', 'total'))
 
     inventory_summary = []
     for bg in VALID_BLOOD_GROUPS:
-        count = available_units.filter(blood_group=bg).count()
+        count = counts.get(bg, 0)
         status_label = 'Adequate' if count >= 10 else 'Low' if count > 0 else 'Critical'
         inventory_summary.append({'blood_group': bg, 'units': count, 'status': status_label})
 

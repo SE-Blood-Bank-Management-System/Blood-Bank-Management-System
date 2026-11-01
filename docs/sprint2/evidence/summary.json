@@ -1,0 +1,47 @@
+{
+  "review_date": "2026-11-01",
+  "baseline_commit": "1d9be8d",
+  "full_regression": {
+    "tests": 419,
+    "seconds": 929.949,
+    "result": "PASS"
+  },
+  "follow_up_tests": {
+    "integration_and_core": 15,
+    "real_unhandled_error": 1,
+    "result": "PASS"
+  },
+  "final_ci_expected_tests": 421,
+  "statement_coverage": {
+    "covered_lines": 3644,
+    "num_statements": 4193,
+    "percent_covered": 86.906749344145,
+    "percent_covered_display": "87",
+    "missing_lines": 549,
+    "excluded_lines": 0,
+    "percent_statements_covered": 86.906749344145,
+    "percent_statements_covered_display": "87"
+  },
+  "demo": {
+    "source_seconds": 240.043,
+    "output_seconds": 120,
+    "speed": 2.0000833333,
+    "steps": 59,
+    "browser_errors": [],
+    "video_sha256": "8d786c6dff9f387dabc7c1742de761c773a6e4338b830d3a835eaa25658d964e",
+    "video_bytes": 4004404,
+    "browser": "Brave/Chromium 156.0.8078.80",
+    "silent": true,
+    "cursor": false,
+    "grey_clicks": true,
+    "native_picker_captures_preserved": true,
+    "delivery_table_readonly_capture_preserved": true
+  },
+  "deployment_check": "PASS with synthetic production-like settings; deployed TLS not tested",
+  "main_ruleset": {
+    "id": 25422093,
+    "name": "Protect main branch",
+    "enforcement": "disabled"
+  },
+  "freeze": "Oct 30 scheduled; Nov 1 integration; owner review and final freeze pending"
+}

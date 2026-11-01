@@ -1,0 +1,2 @@
+# Optional video encoding tooling; not required by the Django application.
+Pillow>=10,<13

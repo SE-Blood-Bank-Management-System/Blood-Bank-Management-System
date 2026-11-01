@@ -1,0 +1,14 @@
+{
+  "method": "Same committed database reopened by a fresh Django application process; no crash simulation",
+  "matching_digest": true,
+  "sha256": "5043dd6d6715c47d255804327c375aa24b92a80a7cdd23e55ca9b5cd3d647ac8",
+  "counts": {
+    "units": 8,
+    "requests": 1,
+    "dispatches": 1,
+    "receipts": 2
+  },
+  "audit_chain_valid": true,
+  "audit_errors": [],
+  "audit_records": 30
+}
