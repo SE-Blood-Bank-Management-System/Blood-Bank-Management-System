@@ -1,0 +1,356 @@
+[
+  {
+    "label": "Running BBMS home",
+    "file": "check-00.png",
+    "time": 0.638,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "abhinav: sign-in page",
+    "file": "check-01.png",
+    "time": 5.41,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: account",
+    "file": "check-02.png",
+    "time": 9.751,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: password",
+    "file": "check-03.png",
+    "time": 14.45,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: signed in",
+    "file": "check-04.png",
+    "time": 18.721,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "Hospital portal",
+    "file": "check-05.png",
+    "time": 22.017,
+    "url": "http://127.0.0.1:8774/requisitions/"
+  },
+  {
+    "label": "New hospital requisition",
+    "file": "check-06.png",
+    "time": 25.379,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Blood-group dropdown open",
+    "file": "check-07.png",
+    "time": 28.656,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "B+ selected",
+    "file": "check-08.png",
+    "time": 33.593,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Component dropdown open",
+    "file": "check-09.png",
+    "time": 36.821,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Red Blood Cells selected",
+    "file": "check-10.png",
+    "time": 41.739,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Quantity: two units",
+    "file": "check-11.png",
+    "time": 45.138,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Required-by date",
+    "file": "check-12.png",
+    "time": 47.256,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Emergency / STAT priority",
+    "file": "check-13.png",
+    "time": 50.451,
+    "url": "http://127.0.0.1:8774/requisitions/new/"
+  },
+  {
+    "label": "Hospital request submitted",
+    "file": "check-14.png",
+    "time": 54.164,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Account navigation menu",
+    "file": "check-15.png",
+    "time": 58.901,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Sign out",
+    "file": "check-16.png",
+    "time": 61.282,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "uttam: sign-in page",
+    "file": "check-17.png",
+    "time": 63.471,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "uttam: account",
+    "file": "check-18.png",
+    "time": 67.486,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "uttam: password",
+    "file": "check-19.png",
+    "time": 72.169,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "uttam: signed in",
+    "file": "check-20.png",
+    "time": 77.214,
+    "url": "http://127.0.0.1:8774/inventory/"
+  },
+  {
+    "label": "Live STAT alert and staff queue",
+    "file": "check-21.png",
+    "time": 80.573,
+    "url": "http://127.0.0.1:8774/requisitions/"
+  },
+  {
+    "label": "Review Abhinav Hospital request",
+    "file": "check-22.png",
+    "time": 83.904,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Staff approval recorded",
+    "file": "check-23.png",
+    "time": 87.594,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Cross-match actual Bag ID",
+    "file": "check-24.png",
+    "time": 94.141,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Compatible cross-match recorded",
+    "file": "check-25.png",
+    "time": 96.837,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "FEFO allocation suggestions",
+    "file": "check-26.png",
+    "time": 100.876,
+    "url": "http://127.0.0.1:8774/inventory/requisitions/1/allocate/"
+  },
+  {
+    "label": "Earliest-expiring bag selected",
+    "file": "check-27.png",
+    "time": 105.623,
+    "url": "http://127.0.0.1:8774/inventory/requisitions/1/allocate/"
+  },
+  {
+    "label": "Second compatible bag selected",
+    "file": "check-28.png",
+    "time": 108.855,
+    "url": "http://127.0.0.1:8774/inventory/requisitions/1/allocate/"
+  },
+  {
+    "label": "Allocation committed",
+    "file": "check-29.png",
+    "time": 112.656,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Dispatch reserved units",
+    "file": "check-30.png",
+    "time": 116.068,
+    "url": "http://127.0.0.1:8774/inventory/requisitions/1/dispatch/"
+  },
+  {
+    "label": "Dispatch committed and manifest generated",
+    "file": "check-31.png",
+    "time": 121.003,
+    "url": "http://127.0.0.1:8774/inventory/manifests/MAN-20261101-AE6FF3/"
+  },
+  {
+    "label": "Account navigation menu",
+    "file": "check-32.png",
+    "time": 126.784,
+    "url": "http://127.0.0.1:8774/inventory/manifests/MAN-20261101-AE6FF3/"
+  },
+  {
+    "label": "Sign out",
+    "file": "check-33.png",
+    "time": 129.134,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "abhinav: sign-in page",
+    "file": "check-34.png",
+    "time": 131.387,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: account",
+    "file": "check-35.png",
+    "time": 135.839,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: password",
+    "file": "check-36.png",
+    "time": 140.559,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "abhinav: signed in",
+    "file": "check-37.png",
+    "time": 144.678,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "Owning hospital tracks dispatch",
+    "file": "check-38.png",
+    "time": 147.896,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Receipt controls and dispatched Bag IDs",
+    "file": "check-39.png",
+    "time": 152.587,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "First bag physically received",
+    "file": "check-40.png",
+    "time": 156.281,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Second bag physically received",
+    "file": "check-41.png",
+    "time": 159.52,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Hospital receipt committed",
+    "file": "check-42.png",
+    "time": 162.958,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Delivered bags and receiver identity",
+    "file": "check-43.png",
+    "time": 166.215,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Account navigation menu",
+    "file": "check-44.png",
+    "time": 171.991,
+    "url": "http://127.0.0.1:8774/requisitions/1/"
+  },
+  {
+    "label": "Sign out",
+    "file": "check-45.png",
+    "time": 174.325,
+    "url": "http://127.0.0.1:8774/"
+  },
+  {
+    "label": "akshay: sign-in page",
+    "file": "check-46.png",
+    "time": 176.51,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "akshay: account",
+    "file": "check-47.png",
+    "time": 180.654,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "akshay: password",
+    "file": "check-48.png",
+    "time": 185.393,
+    "url": "http://127.0.0.1:8774/accounts/login/"
+  },
+  {
+    "label": "akshay: signed in",
+    "file": "check-49.png",
+    "time": 189.658,
+    "url": "http://127.0.0.1:8774/inventory/"
+  },
+  {
+    "label": "Component separation: safe whole blood",
+    "file": "check-50.png",
+    "time": 192.93,
+    "url": "http://127.0.0.1:8774/inventory/blood-units/BAG-AKSHAY-WHOLE/separate/"
+  },
+  {
+    "label": "Traceable components and volumes",
+    "file": "check-51.png",
+    "time": 196.635,
+    "url": "http://127.0.0.1:8774/inventory/blood-units/BAG-AKSHAY-WHOLE/separate/"
+  },
+  {
+    "label": "Execute component separation",
+    "file": "check-52.png",
+    "time": 201.851,
+    "url": "http://127.0.0.1:8774/inventory/blood-units/BAG-AKSHAY-WHOLE/"
+  },
+  {
+    "label": "Parent / child component traceability",
+    "file": "check-53.png",
+    "time": 206.067,
+    "url": "http://127.0.0.1:8774/inventory/blood-units/BAG-AKSHAY-WHOLE/"
+  },
+  {
+    "label": "Inventory, donation and requisition reports",
+    "file": "check-54.png",
+    "time": 210.327,
+    "url": "http://127.0.0.1:8774/reports/"
+  },
+  {
+    "label": "Requisition fulfilment report",
+    "file": "check-55.png",
+    "time": 214.704,
+    "url": "http://127.0.0.1:8774/reports/"
+  },
+  {
+    "label": "Download actual CSV report",
+    "file": "check-56.png",
+    "time": 219.069,
+    "url": "http://127.0.0.1:8774/reports/"
+  },
+  {
+    "label": "Central tamper-evident audit log",
+    "file": "check-57.png",
+    "time": 221.995,
+    "url": "http://127.0.0.1:8774/audit-log/"
+  },
+  {
+    "label": "Read-only audit records and team actors",
+    "file": "check-58.png",
+    "time": 227.843,
+    "url": "http://127.0.0.1:8774/audit-log/"
+  }
+]
