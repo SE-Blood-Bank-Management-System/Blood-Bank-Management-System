@@ -20,6 +20,13 @@ from requisitions.services import confirm_receipt, record_cross_match, review_re
 
 
 class Sprint2IntegrationTests(TestCase):
+    def test_public_search_uses_one_stock_query_for_all_eight_groups(self):
+        self.unit()
+        with self.assertNumQueries(1):
+            response = self.client.get(reverse('core:public_availability'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['inventory_summary']), 8)
+
     @classmethod
     def setUpTestData(cls):
         cls.hospital = User.objects.create_user('abhinav', role='HOSPITAL', hospital_name='Abhinav Hospital')
