@@ -18,6 +18,22 @@
 
 https://github.com/user-attachments/assets/d119a3fc-9cf0-4850-a538-b834794d244c
 
+## Sprint 2 final demo and acceptance record
+
+[Watch/download the two-minute Sprint 2 demo](demo/BBMS_Sprint2_Demo.mp4).
+Recorded from the running app with synthetic team-name accounts, visible dropdowns,
+grey click indicators, no cursor/audio, and one constant 2× playback rate.
+The four-minute recording executes hospital request → approval → cross-match →
+FEFO allocation → dispatch → receipt, then component traceability, CSV and audit.
+
+See [final acceptance and NFR results](docs/sprint2/acceptance.md),
+[setup/user guidance](docs/sprint2/user-guide.md),
+[state/role/API deviations](docs/sprint2/interfaces.md), and the
+[91-requirement RTM](docs/sprint2/requirements-traceability.csv).
+The local 50-session availability-search target remains unmet; missing deployment,
+uptime, usability and browser-matrix evidence is explicitly recorded. This is a
+conditional acceptance handoff, not a claim that every SRS/NFR is complete.
+
 ---
 
 ## 1. Project Overview
@@ -106,6 +122,7 @@ The system implements slot-based blood donation appointment scheduling, strict c
 | **`appointments`** | SRS 4.4 | Slot booking, time slot capacity management, appointment rescheduling, and cancellation. |
 | **`inventory`** | SRS 4.6–4.12 | Bag ID assignment, ABO/Rh blood groups, mandatory serology testing (HIV, Hep B/C, Syphilis), quarantine rules, component separation, FEFO inventory. |
 | **`core`** | SRS 2.1, 3.1, 4.22 | Base template, role-aware navigation bar, landing page, privacy-compliant public blood availability lookup, and global UI assets. |
+| **`requisitions`** | SRS 4.14–4.18 | Hospital requests, STAT queue, review, component-aware cross-match, dispatch evidence and receipt confirmation. |
 
 ---
 
@@ -156,7 +173,7 @@ Populate the database with realistic demo accounts across all user roles, donati
 ```bash
 python manage.py seed_data
 ```
-*(Or use the alias `python manage.py seed_demo_data`). This command is idempotent and can be safely re-run at any time.*
+*(Or use the alias `python manage.py seed_demo_data`). Demo data only: rerunning resets documented demo passwords. Never run it against real user data; use the isolated Sprint 2 runner described above.*
 
 #### Pre-Configured Demo Accounts:
 | Role | Username / Email | Password | Primary Showcase Workflow |
