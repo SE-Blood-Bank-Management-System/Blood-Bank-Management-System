@@ -24,8 +24,8 @@ class Requisition(models.Model):
 
     requisition_id = models.CharField(max_length=36, unique=True, default=generate_requisition_id, editable=False)
     hospital = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='requisitions')
-    # Use the canonical values as labels until the shared B+ label is corrected in #43.
-    blood_group = models.CharField(max_length=5, choices=[(value, value) for value in BloodGroup.values])
+    # Shared BloodGroup choices (SRS BBMS-F-022, Issue #43)
+    blood_group = models.CharField(max_length=5, choices=BloodGroup.choices)
     component_type = models.CharField(max_length=30, choices=ComponentType.choices)
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     required_by = models.DateField()

@@ -219,7 +219,7 @@ class UserProfileUpdateForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
     )
     blood_group = forms.ChoiceField(
-        choices=[('', 'Unknown / Not sure')] + [(value, value) for value in User.BloodGroup.values],
+        choices=[('', 'Unknown / Not sure')] + list(User.BloodGroup.choices),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )

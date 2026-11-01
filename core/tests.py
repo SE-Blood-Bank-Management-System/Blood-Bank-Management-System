@@ -72,6 +72,12 @@ class BloodGroupConstantsTests(TestCase):
         self.assertEqual(set(VALID_BLOOD_GROUPS), expected_groups)
         self.assertEqual(len(VALID_BLOOD_GROUPS), 8)
         self.assertEqual(len(BloodGroup.choices), 8)
+        # Verify B+ label is 'B+' and not 'B-' (regression check for Issue #43)
+        self.assertEqual(BloodGroup.B_POS.value, 'B+')
+        self.assertEqual(BloodGroup.B_POS.label, 'B+')
+        # Verify all choices have matching values and display labels
+        for value, label in BloodGroup.choices:
+            self.assertEqual(value, label, f"Value '{value}' does not match label '{label}'")
 
     def test_is_valid_blood_group_helper(self):
         from core.constants import VALID_BLOOD_GROUPS, is_valid_blood_group
@@ -119,3 +125,12 @@ class BloodGroupConstantsTests(TestCase):
             set(get_compatible_donor_groups(BloodGroup.A_NEG)),
             {BloodGroup.O_NEG, BloodGroup.A_NEG}
         )
+        # Verify B+ compatibility rules (Issue #43 regression)
+        self.assertEqual(
+            set(get_compatible_donor_groups(BloodGroup.B_POS)),
+            {BloodGroup.O_NEG, BloodGroup.O_POS, BloodGroup.B_NEG, BloodGroup.B_POS}
+        )
+        self.assertTrue(is_blood_compatible(BloodGroup.B_POS, BloodGroup.B_POS))
+        self.assertTrue(is_blood_compatible(BloodGroup.B_POS, BloodGroup.AB_POS))
+        self.assertFalse(is_blood_compatible(BloodGroup.A_POS, BloodGroup.B_POS))
+        self.assertFalse(is_blood_compatible(BloodGroup.AB_POS, BloodGroup.B_POS))

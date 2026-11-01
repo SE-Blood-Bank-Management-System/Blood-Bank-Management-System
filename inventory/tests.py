@@ -8,6 +8,7 @@ SRS References:
 - Section 5.1.2 (BBMS-SR-001, BBMS-SR-003): Security & RBAC Enforcement
 """
 import json
+import re
 from datetime import timedelta
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError
@@ -15,13 +16,19 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.forms import (
+    DonorRegistrationForm,
+    UserProfileUpdateForm,
+)
 from accounts.models import User
 from core.constants import BloodGroup, VALID_BLOOD_GROUPS
 from inventory.forms import (
     BloodCollectionForm,
     BloodGroupCorrectionForm,
+    InventoryFilterForm,
     SerologyPanelForm,
 )
+from requisitions.forms import RequisitionForm
 from inventory.models import (
     BloodUnit,
     BloodUnitStatus,
@@ -1068,5 +1075,183 @@ class SerologyQuarantineTests(TestCase):
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.status, BloodUnitStatus.AVAILABLE)
         self.assertRedirects(res, reverse('inventory:unit_detail', kwargs={'bag_id': self.unit.bag_id}))
+
+
+class BloodGroupDropdownSmokeTests(TestCase):
+    """
+    Focused regression and dropdown smoke checks for blood group display labels.
+    SRS References:
+    - Section 4.7 (BBMS-F-022, BBMS-F-023): ABO/Rh Blood Group Management
+    - NF-009: Form Usability & Disambiguation
+    - TC-BAG-02: Blood Group Management & Dropdown Smoke Check
+    - Issue #43: Correct BloodGroup.B_POS display label from B- to B+
+    """
+    def setUp(self):
+        self.client = Client()
+        self.donor = User.objects.create_user(
+            username='dropdown_donor',
+            email='dropdown_donor@example.com',
+            password='Password123!',
+            role=User.Role.DONOR,
+            blood_group=BloodGroup.B_POS,
+            date_of_birth=timezone.now().date() - timedelta(days=365.25 * 25)
+        )
+        self.staff = User.objects.create_user(
+            username='dropdown_staff',
+            email='dropdown_staff@example.com',
+            password='Password123!',
+            role=User.Role.STAFF
+        )
+        self.hospital = User.objects.create_user(
+            username='dropdown_hospital',
+            email='dropdown_hospital@example.com',
+            password='Password123!',
+            role=User.Role.HOSPITAL,
+            is_approved=True,
+            hospital_name='City General Hospital',
+            license_number='LIC-SMOKE-001'
+        )
+
+    def test_dropdown_choices_in_all_target_forms(self):
+        """
+        Verify that all eight standard ABO/Rh blood groups are present and correctly
+        labeled (specifically B+ displays as 'B+', not 'B-') across all target forms.
+        """
+        forms_to_check = [
+            ('DonorRegistrationForm', DonorRegistrationForm()),
+            ('UserProfileUpdateForm', UserProfileUpdateForm()),
+            ('BloodCollectionForm', BloodCollectionForm()),
+            ('InventoryFilterForm', InventoryFilterForm()),
+            ('BloodGroupCorrectionForm', BloodGroupCorrectionForm()),
+            ('RequisitionForm', RequisitionForm()),
+        ]
+
+        expected_groups = ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')
+
+        for form_name, form in forms_to_check:
+            self.assertIn('blood_group', form.fields, f"{form_name} missing blood_group field")
+            choices_dict = dict(form.fields['blood_group'].choices)
+
+            # 1. Verify B+ is explicitly mapped to 'B+' and not 'B-' (Issue #43 regression)
+            self.assertEqual(
+                choices_dict.get('B+'),
+                'B+',
+                f"{form_name} displays incorrect label for B+: {choices_dict.get('B+')}"
+            )
+            self.assertEqual(
+                choices_dict.get('B-'),
+                'B-',
+                f"{form_name} displays incorrect label for B-: {choices_dict.get('B-')}"
+            )
+
+            # 2. Verify all eight blood groups have matching label and value
+            for bg in expected_groups:
+                self.assertIn(bg, choices_dict, f"{form_name} missing blood group {bg}")
+                self.assertEqual(choices_dict[bg], bg, f"{form_name} label mismatch for {bg}")
+
+            # 3. Verify no duplicated labels among valid blood groups
+            valid_labels = [label for val, label in form.fields['blood_group'].choices if val in expected_groups]
+            self.assertEqual(len(valid_labels), 8)
+            self.assertEqual(len(set(valid_labels)), 8, f"{form_name} has duplicate blood group labels")
+
+    def test_dropdown_rendered_in_all_target_views(self):
+        """
+        Perform HTTP GET dropdown smoke check across registration/profile, collection,
+        inventory dashboard filters, and new request views.
+        """
+        # 1. Registration view (public)
+        res_reg = self.client.get(reverse('accounts:register_donor'))
+        self.assertEqual(res_reg.status_code, 200)
+        match_reg = re.search(r'<option value="B\+"[^>]*>([^<]+)</option>', res_reg.content.decode())
+        self.assertTrue(match_reg, "B+ option not rendered in donor registration form")
+        self.assertEqual(match_reg.group(1).strip(), 'B+')
+
+        # 2. Donor Profile view (authenticated donor)
+        self.client.force_login(self.donor)
+        res_prof = self.client.get(reverse('accounts:profile'))
+        self.assertEqual(res_prof.status_code, 200)
+        match_prof = re.search(r'<option value="B\+"[^>]*>([^<]+)</option>', res_prof.content.decode())
+        self.assertTrue(match_prof, "B+ option not rendered in donor profile form")
+        self.assertEqual(match_prof.group(1).strip(), 'B+')
+
+        # 3. Collection view (authenticated staff)
+        self.client.force_login(self.staff)
+        res_col = self.client.get(reverse('inventory:record_collection'))
+        self.assertEqual(res_col.status_code, 200)
+        match_col = re.search(r'<option value="B\+"[^>]*>([^<]+)</option>', res_col.content.decode())
+        self.assertTrue(match_col, "B+ option not rendered in collection form")
+        self.assertEqual(match_col.group(1).strip(), 'B+')
+
+        # 4. Inventory Dashboard Filters view (authenticated staff)
+        res_dash = self.client.get(reverse('inventory:dashboard'))
+        self.assertEqual(res_dash.status_code, 200)
+        match_dash = re.search(r'<option value="B\+"[^>]*>([^<]+)</option>', res_dash.content.decode())
+        self.assertTrue(match_dash, "B+ option not rendered in inventory filter form")
+        self.assertEqual(match_dash.group(1).strip(), 'B+')
+
+        # 5. New Request Form view (authenticated hospital)
+        self.client.force_login(self.hospital)
+        res_req = self.client.get(reverse('requisitions:create'), secure=True)
+        self.assertEqual(res_req.status_code, 200)
+        match_req = re.search(r'<option value="B\+"[^>]*>([^<]+)</option>', res_req.content.decode())
+        self.assertTrue(match_req, "B+ option not rendered in new request form")
+        self.assertEqual(match_req.group(1).strip(), 'B+')
+
+    def test_form_submission_preserves_stored_b_plus_value(self):
+        """
+        Verify that selecting and submitting B+ in forms correctly preserves
+        and stores the string 'B+' in the database without corruption.
+        """
+        # Collection form submission
+        col_form = BloodCollectionForm(data={
+            'donor': self.donor.pk,
+            'blood_group': BloodGroup.B_POS,
+            'component_type': ComponentType.WHOLE_BLOOD,
+            'volume_ml': 450,
+            'location': 'Central Blood Bank',
+            'collection_notes': 'Smoke check collection'
+        })
+        self.assertTrue(col_form.is_valid(), f"BloodCollectionForm errors: {col_form.errors}")
+        unit = col_form.save()
+        self.assertEqual(unit.blood_group, 'B+')
+        unit.refresh_from_db()
+        self.assertEqual(unit.blood_group, 'B+')
+
+        # Blood group correction form submission
+        correction_form = BloodGroupCorrectionForm(data={
+            'blood_group': BloodGroup.B_POS,
+            'notes': 'Serology verified B+'
+        })
+        self.assertTrue(correction_form.is_valid(), f"BloodGroupCorrectionForm errors: {correction_form.errors}")
+        self.assertEqual(correction_form.cleaned_data['blood_group'], 'B+')
+
+        # User profile update form submission
+        profile_form = UserProfileUpdateForm(instance=self.donor, data={
+            'phone': '9876543210',
+            'address': '789 Testing Way',
+            'blood_group': BloodGroup.B_POS,
+        })
+        self.assertTrue(profile_form.is_valid(), f"UserProfileUpdateForm errors: {profile_form.errors}")
+        saved_donor = profile_form.save()
+        saved_donor.refresh_from_db()
+        self.assertEqual(saved_donor.blood_group, 'B+')
+
+    def test_compatibility_behaviour_retained_for_b_pos(self):
+        """
+        Verify compatibility rules remain functional and intact for BloodGroup.B_POS.
+        """
+        from requisitions.compatibility import is_transfusion_compatible, get_compatible_donor_groups
+
+        # RBC compatibility: B+ recipient can accept O-, O+, B-, B+
+        compatible_donors = get_compatible_donor_groups(BloodGroup.B_POS, ComponentType.RBC)
+        self.assertEqual(
+            set(compatible_donors),
+            {BloodGroup.O_NEG, BloodGroup.O_POS, BloodGroup.B_NEG, BloodGroup.B_POS}
+        )
+        self.assertTrue(is_transfusion_compatible(BloodGroup.B_POS, BloodGroup.AB_POS, ComponentType.RBC))
+        self.assertTrue(is_transfusion_compatible(BloodGroup.B_POS, BloodGroup.B_POS, ComponentType.RBC))
+        self.assertFalse(is_transfusion_compatible(BloodGroup.B_POS, BloodGroup.A_POS, ComponentType.RBC))
+        self.assertFalse(is_transfusion_compatible(BloodGroup.B_POS, BloodGroup.O_POS, ComponentType.RBC))
+
 
 
