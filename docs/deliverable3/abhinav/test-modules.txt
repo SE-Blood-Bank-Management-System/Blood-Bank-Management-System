@@ -1,0 +1,17 @@
+accounts.test_registration
+accounts.test_login
+accounts.test_sessions
+donors.test_profile_views
+donors.test_history_rules
+donors.test_profile_api
+inventory.test_quarantine_views
+inventory.test_status_transitions
+inventory.test_status_integrity
+requisitions.tests.test_services
+requisitions.tests.test_views
+requisitions.tests.test_api
+requisitions.tests.test_polling_sessions
+requisitions.tests.test_delivery
+core.test_sprint2_integration
+core.test_nfr_reliability
+inventory.test_status_migration
