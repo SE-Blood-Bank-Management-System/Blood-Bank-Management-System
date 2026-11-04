@@ -350,3 +350,18 @@ python manage.py test core.test_security_deployment
 python manage.py verify_audit_integrity
 ```
 See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md), [central tamper-evident audit log guide](docs/central-audit-log.md), and [system reports & CSV analytics guide](docs/reports-and-csv-analytics.md).
+
+## Deliverable 3: Abhinav's test-case contribution
+
+The final testing/documentation phase follows existing feature ownership; it does
+not introduce another sprint. Abhinav's [updated test cases](docs/deliverable3/abhinav/test-cases.md)
+cover registration, login/sessions, donor profile/history, quarantine/status
+history, requisitions/STAT, delivery confirmation and integration regressions.
+The [CSV catalogue](docs/deliverable3/abhinav/test-cases.csv) provides 59 scenarios
+with requirements, steps, expected results and exact automated test labels.
+
+The [4 November execution record](docs/deliverable3/abhinav/execution.md) records
+137 passing tests across 17 scoped modules. Manual/NFR follow-ups and previous
+failed or blocked checks remain explicit. This contribution does not replace the
+team's whole-project unit, system-validation, statement-coverage and branch-coverage
+reports.
