@@ -368,3 +368,17 @@ All 41 test cases defined in the baseline **Software Test Plan (BBMS-TP-001)** w
 - [Code Coverage Report](docs/code-coverage-report.md): Statement-level metrics, per-file analysis, and NF-011 threshold evaluation.
 - [Branch Coverage Report](docs/branch-coverage-report.md): Decision-branch analysis covering lockout counters, rate limits, serology states, cross-matching overrides, and audit immutability.
 
+## Deliverable 3: Abhinav's test-case contribution
+
+The final testing/documentation phase follows existing feature ownership; it does
+not introduce another sprint. Abhinav's [updated test cases](docs/deliverable3/abhinav/test-cases.md)
+cover registration, login/sessions, donor profile/history, quarantine/status
+history, requisitions/STAT, delivery confirmation and integration regressions.
+The [CSV catalogue](docs/deliverable3/abhinav/test-cases.csv) provides 59 scenarios
+with requirements, steps, expected results and exact automated test labels.
+
+The [4 November execution record](docs/deliverable3/abhinav/execution.md) records
+137 passing tests across 17 scoped modules. Manual/NFR follow-ups and previous
+failed or blocked checks remain explicit. This contribution does not replace the
+team's whole-project unit, system-validation, statement-coverage and branch-coverage
+reports.

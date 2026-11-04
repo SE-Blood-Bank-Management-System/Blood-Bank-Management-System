@@ -1,0 +1,573 @@
+{
+  "date": "2026-11-04",
+  "timezone": "Asia/Calcutta",
+  "baseline_commit": "076935a",
+  "scope": "Abhinav owner-scoped existing regression tests",
+  "python": "3.12.14",
+  "django": "5.2.18",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "database": "Django isolated in-memory SQLite test database",
+  "command": "python manage.py test accounts.test_registration accounts.test_login accounts.test_sessions donors.test_profile_views donors.test_history_rules donors.test_profile_api inventory.test_quarantine_views inventory.test_status_transitions inventory.test_status_integrity requisitions.tests.test_services requisitions.tests.test_views requisitions.tests.test_api requisitions.tests.test_polling_sessions requisitions.tests.test_delivery core.test_sprint2_integration core.test_nfr_reliability inventory.test_status_migration --verbosity 2",
+  "exit_code": 0,
+  "tests_run": 137,
+  "duration_seconds": 74.513,
+  "result": "OK",
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "catalogue_cases": 59,
+  "manual_and_nfr_followups_run": false,
+  "coverage_measured": false,
+  "original_local_log_sha256": "07200adf947676f8e79a3f3827d7a037b892c824a8ab3bc6b69720a09ac2a8a6",
+  "provenance": "Labels extracted from the verbose run; successful runner summary and process exit code checked. Synthetic security logs omitted.",
+  "test_results": [
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_authenticated_user_is_redirected",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_birthday_boundary_and_future_dates",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_case_insensitive_duplicate_email_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_duplicate_email_claimed_after_validation_shows_field_error",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_email_can_exceed_username_length",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_email_matching_existing_username_is_rejected_to_avoid_ambiguous_login",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_failure_during_save_rolls_back_account",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_invalid_choices_and_contact_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_password_validation_uses_donor_attributes",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_privileged_fields_cannot_be_submitted",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_registration_creates_existing_user_profile_and_hashes_password",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_registration_page_is_public_and_csrf_protected",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_required_fields_rejected_without_creating_user",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_save_commit_false_does_not_persist",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_registration.DonorRegistrationTests.test_validation_preserves_values_and_shows_inline_errors_but_no_password",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_all_roles_reach_the_existing_role_destination",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_ambiguous_identifier_is_rejected_by_all_configured_backends",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_email_is_case_insensitive_and_username_still_works",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_email_longer_than_username_limit_can_use_login_form",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_inactive_and_unapproved_users_cannot_log_in",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_invalid_credentials_and_required_fields_do_not_authenticate",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_public_visitors_cannot_access_role_protected_pages",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_safe_next_survives_a_failed_attempt",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_login.LoginSecurityTests.test_unsafe_next_urls_fall_back_to_role_destination",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_activity_renews_server_expiry_and_cookie",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_expired_session_cannot_access_protected_html_or_api",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_get_does_not_log_user_out",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_login_and_logout_require_csrf_tokens",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_login_response_is_not_cacheable",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_login_rotates_preexisting_session_key",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_logout_flushes_session_and_old_cookie_cannot_be_replayed",
+      "status": "PASS"
+    },
+    {
+      "test": "accounts.test_sessions.SecureSessionTests.test_secure_cookie_has_explicit_expiry",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_dashboard_displays_real_counts_and_recent_donations",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_donor_cannot_select_another_donor_or_discover_missing_accounts",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_empty_history_and_unauthenticated_access",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_history_is_paginated",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_history_is_private_ordered_and_contains_collection_details",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_invalid_updates_show_errors_and_preserve_values_without_saving",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_own_profile_displays_registered_fields_and_next_date",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_profile_renders_stored_markup_as_text",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_staff_and_admin_can_review_donor_details_but_cannot_edit_them",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_staff_missing_donor_is_404_and_hospital_access_is_forbidden",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_views.DonorProfileViewTests.test_updates_only_permitted_fields_and_not_laboratory_group",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_api_pagination_does_not_count_another_donors_records",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_api_requires_authentication_and_donor_role",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_donation_json_is_private_and_excludes_staff_information",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_empty_api_history_and_pending_screening_are_explicit",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_invalid_fields_and_privileged_updates_are_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_malformed_json_and_wrong_types_are_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_next_date_and_screening_are_distinct",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_other_http_methods_are_not_accepted",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_partial_update_preserves_omitted_fields_and_lab_group",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_profile_put_requires_csrf_and_accepts_a_valid_token",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_profile_api.DonorProfileAPITests.test_profile_returns_only_own_public_profile_fields",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_default_interval_is_90_days_after_latest_collection",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_discarded_collection_still_counts_as_a_donation",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_exact_interval_boundary_is_inclusive",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_first_time_donor_has_empty_history_and_no_interval_deadline",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_future_records_components_and_other_donors_do_not_count",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_interval_can_be_configured",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_interval_uses_configured_local_calendar_date",
+      "status": "PASS"
+    },
+    {
+      "test": "donors.test_history_rules.DonationIntervalTests.test_invalid_interval_configuration_is_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_admin_can_read_and_all_views_reject_mutations",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_history_retains_old_states_and_staff_after_unit_leaves_quarantine",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_no_available_units_returns_real_zero_counts",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_pagination_uses_total_count_and_history_remains_bounded",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_public_and_staff_availability_exclude_unsafe_and_expired_units",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_queue_json_includes_current_entry_timestamp_and_unknown_blood_group",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_queue_lists_only_quarantined_units_with_elapsed_time",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_unauthorized_roles_cannot_read_html_or_api",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_quarantine_views.QuarantineAndHistoryViewTests.test_unknown_unit_history_returns_404_and_reason_is_escaped",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_collection_creates_initial_entry_with_recording_staff",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_direct_change_logs_persisted_states_actor_and_time",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_dry_run_does_not_write_history_until_saved",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_history_failure_rolls_back_status_and_serology_panel",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_noop_and_unrelated_partial_updates_do_not_invent_events",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_return_to_quarantine_resets_elapsed_time",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_serology_transitions_record_staff_without_duplicate_events",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_stale_instances_use_actual_previous_status_and_preserve_history",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_transitions.StatusTransitionTests.test_unauthorized_actor_and_unknown_status_are_rejected",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_actor_snapshot_survives_account_rename_and_deletion",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_admin_save_records_actual_request_user_and_history_admin_is_read_only",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_bulk_import_creates_history_and_blocks_conflicting_upserts",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_direct_audit_failure_rolls_back_unit_state",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_partial_invalid_serology_panel_rolls_back_earlier_results",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_queryset_status_updates_and_bulk_updates_cannot_bypass_history",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_status_history_is_append_only",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_integrity.StatusHistoryIntegrityTests.test_unit_deletion_cannot_remove_status_history",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_approval_and_rejection_are_audited_with_actor_and_reason",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_events_cannot_be_edited_or_deleted",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_invalid_review_or_missing_reason_has_no_side_effects",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_priority_ownership_no_op_and_pending_only",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_stale_review_cannot_overwrite_priority_change",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.ReviewAndPriorityTests.test_stat_queue_and_alerts_follow_submission_and_review",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.SubmissionTests.test_actor_permissions_are_rechecked_from_database",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.SubmissionTests.test_hospital_visibility_is_scoped_and_staff_sees_both",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.SubmissionTests.test_unique_pending_requests_and_submission_event",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.SubmissionTests.test_validation_and_atomic_submission_audit",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_services.SubmissionTests.test_zero_quantity_rejected_at_database_boundary",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_admin_records_cannot_bypass_review",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_csrf_required_for_html_submission_and_priority",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_filters_pagination_and_gets_cannot_mutate",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_hospital_cannot_see_another_hospital_request_or_review_it",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_hospital_submits_tracks_and_updates_priority",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_invalid_submission_and_blood_group_labels",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_live_alerts_include_new_stat_without_reloading_the_page",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_role_denials_include_donor_with_django_staff_flag",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_staff_queue_review_and_reason_display",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_stale_or_repeated_review_returns_visible_conflict",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_views.RequisitionViewTests.test_unapproved_or_inactive_hospital_cannot_submit",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_create_list_detail_and_hospital_isolation",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_csrf_is_enforced_on_json_create_review_and_priority",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_invalid_json_types_fields_and_dates_are_400",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_permissions_for_anonymous_unapproved_inactive_and_flagged_donor",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_priority_cannot_be_changed_by_foreign_hospital_or_after_review",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_review_priority_stale_version_and_no_manual_fulfilment",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_staff_can_read_but_cannot_submit_as_a_hospital",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_api.RequisitionAPITests.test_unknown_status_or_wrong_method_never_changes_data",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_polling_sessions.PassivePollingSessionTests.test_interactive_page_request_still_renews_inactivity_expiry",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_polling_sessions.PassivePollingSessionTests.test_poll_cannot_extend_idle_session_and_expired_cookie_is_cleared",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_duplicate_stale_and_mixed_batches_are_atomic",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_failure_in_audit_rolls_back_receipt_status_and_version",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_hospital_cannot_bypass_receipt_service_with_unit_save",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_only_active_approved_owner_can_confirm",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_partial_dispatch_receipt_does_not_fulfil_remaining_quantity",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_receipt_history_cannot_be_rewritten_or_deleted",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_receipt_keeps_fulfilment_and_available_counts_and_records_identity",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryTests.test_rejects_foreign_unknown_duplicate_and_non_dispatched_bags",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryWebTests.test_canonical_delivery_api_and_repeated_submission",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryWebTests.test_foreign_tracking_and_confirmation_are_hidden_and_csrf_enforced",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryWebTests.test_invalid_payload_and_invalid_form_have_no_side_effects",
+      "status": "PASS"
+    },
+    {
+      "test": "requisitions.tests.test_delivery.DeliveryWebTests.test_tracking_page_api_and_html_confirmation",
+      "status": "PASS"
+    },
+    {
+      "test": "core.test_sprint2_integration.Sprint2IntegrationTests.test_component_compatibility_is_shared_by_cross_match_fefo_and_allocation",
+      "status": "PASS"
+    },
+    {
+      "test": "core.test_sprint2_integration.Sprint2IntegrationTests.test_partial_then_full_dispatch_receipt_reports_and_audit_reconcile",
+      "status": "PASS"
+    },
+    {
+      "test": "core.test_sprint2_integration.Sprint2IntegrationTests.test_public_search_uses_one_stock_query_for_all_eight_groups",
+      "status": "PASS"
+    },
+    {
+      "test": "core.test_nfr_reliability.ErrorLoggingAcceptanceTests.test_unhandled_error_records_timestamp_stack_trace_and_safe_response",
+      "status": "PASS"
+    },
+    {
+      "test": "inventory.test_status_migration.StatusHistoryMigrationTests.test_existing_units_keep_legacy_history_and_receive_quarantine_start",
+      "status": "PASS"
+    }
+  ]
+}
