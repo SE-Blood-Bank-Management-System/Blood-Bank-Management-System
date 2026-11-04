@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-04",
+  "baseline": "3adb416",
+  "full_suite": {
+    "tests_run": 421,
+    "seconds": 1303.322,
+    "result": "OK",
+    "exit_code": 0
+  },
+  "coverage": {
+    "statement_percent": 87.55067970426902,
+    "covered_lines": 3671,
+    "statements": 4193,
+    "branch_percent": 70.01522070015221,
+    "covered_branches": 920,
+    "branches": 1314,
+    "scope": "Existing .coveragerc business modules and exclusions; full suite; --branch enabled."
+  },
+  "power_scheme_observed_between_runs": "Balanced (381b4222-f694-41f0-9685-ff5bb260df2e)",
+  "power_limitations": "AC/battery/saver status unavailable; no power settings changed. Other laptop workload not fully controlled.",
+  "sequence": "Initial HTTP load; live browser checks plus separate full-suite coverage; temporary test tabs closed; coverage completes; repeat HTTP load with no agent browser/coverage work in parallel.",
+  "repeat_comparability": "Same server/DB; repeated helper creates another 50 donors, 50 sessions and 10 bookings. The intervening browser flow also delivered one bag and created a request/manifest/receipt and donor. It is not an identical frozen fixture or controlled production benchmark.",
+  "production_deployment_check": "manage.py check --deploy: no issues, synthetic DEBUG=False/host/secret/SSL settings; not live TLS."
+}

@@ -8,8 +8,8 @@ left as follow-ups. It does not introduce a new sprint or reassign other owners.
 ## Environment and interpretation
 
 Real application: Django development server on port 8773, Windows/Python/SQLite,
-with a fresh synthetic database outside the repository. Normal `db.sqlite3` was
-not opened. Secure cookie flags were disabled only by the existing loopback demo
+with a fresh synthetic database outside the repository. These browser, load and
+persistence checks did not use normal `db.sqlite3`. Secure cookie flags were disabled only by the existing loopback demo
 runner; outbound email used its in-memory backend. No deployed TLS claim follows.
 
 The load client is Python on the user's laptop sending real HTTP requests directly
@@ -86,6 +86,64 @@ is outside the request timing. Booking samples create ten persisted appointments
 using distinct donor sessions, CSRF and an isolated slot with capacity 60.
 See JSON for every response status and duration. The load helper reports completed
 measurements even when thresholds fail; its process exit code is not a Pass verdict.
+
+## Repeat load and full-suite coverage
+
+The second run was performed after coverage completed and the temporary test tabs
+were closed, with no agent browser or test runner active in parallel. The power scheme read **Balanced**;
+AC/battery-saver status could not be inspected. Background laptop workload was not
+fully controlled. The helper added another 50 synthetic donors/sessions and ten
+bookings to the same server/database; the intervening browser flow also created
+the request/manifest/receipt and donor, and moved one unit to Delivered. This is
+not an identical frozen-data repetition. Both runs are retained; neither result
+is selectively discarded.
+
+[Repeat request-level evidence](evidence/nfr-repeat-20261104.json):
+
+| Workload | Median | p95 | Maximum | Result |
+| --- | ---: | ---: | ---: | --- |
+| NF-001 search | 6.929777s | 7.900875s | 8.226179s | Fail locally; HTTP [200] |
+| NF-003 authenticated reads | 1.269418s | 2.054195s | 2.168112s | Fail locally; HTTP [200] |
+| NF-002 bookings | 0.080970s | 0.106062s | 0.111267s | Pass locally; HTTP [201] |
+
+The complete regression finished with **421 tests passed in 1303.322s**,
+exit code 0. The isolated full-suite database is separate from the browser/load
+database. The local TCP SMTP delivery test was included. Coverage used
+`coverage run --branch manage.py test` and the committed `.coveragerc`:
+
+- **Statement coverage: 87.55%**, 3671/4193 executable statements.
+- **Branch coverage: 70.02%**, 920/1314 branch exits.
+- Coverage.py's printed TOTAL combines statement and branch opportunities when
+  branch mode is enabled; it must not be relabelled as statement-only coverage.
+- The SRS business-logic statement threshold of 60% is met. Branch coverage is
+  reported separately without inventing an additional course threshold.
+
+Raw [coverage JSON](evidence/coverage-20261104.json),
+[coverage text](evidence/coverage-20261104.txt), and
+[verification summary](evidence/verification-summary-20261104.json) retain scope,
+counts and results. Tests, migrations, admin/URL/app registration and management
+commands are excluded exactly as specified in `.coveragerc`; all six business
+applications are measured. This is a whole-suite business-code measurement, not
+an assertion that unmeasured code or every SRS case passed.
+
+A fresh production-mode `manage.py check --deploy` also returned no issues with
+synthetic host/secret/SSL settings. See [output](evidence/deploy-check-20261104.txt).
+This does not contact a deployed HTTPS endpoint.
+
+### Anonymous comparison and ordinary browsing
+
+A supplementary direct-HTTP check used no cookies against the same
+`/availability/` page after the repeated acceptance workloads. One anonymous
+request took **0.090243s**; a synchronized burst of 50 anonymous clients had
+median/p95/max **0.633326/1.583410/1.604814s**, all HTTP 200.
+[Raw comparison](evidence/anonymous-comparison-20261104.json) retains all timings.
+
+This demonstrates why a normal anonymous page visit can feel fast while the
+authenticated-session workload misses its target. It does not invalidate either
+measurement or close NF-001/NF-003 for all supported users. The difference suggests
+investigating authentication/session persistence and SQLite contention, but no
+profiling was performed to establish a root cause. Browser render/network-proxy
+time is not part of these direct loopback HTTP timings.
 
 ## Reliability and integrity
 

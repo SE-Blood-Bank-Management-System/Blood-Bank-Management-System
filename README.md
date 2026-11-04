@@ -365,3 +365,8 @@ The [4 November execution record](docs/deliverable3/abhinav/execution.md) record
 failed or blocked checks remain explicit. This contribution does not replace the
 team's whole-project unit, system-validation, statement-coverage and branch-coverage
 reports.
+
+The [4 November live browser and NFR follow-up](docs/deliverable3/abhinav/manual-nfr-report.md)
+adds observed form/STAT/receipt checks, repeat HTTP load measurements, fresh-process
+persistence and full-suite statement/branch coverage. Failed local performance
+targets and unavailable independent/deployment checks remain explicit.
