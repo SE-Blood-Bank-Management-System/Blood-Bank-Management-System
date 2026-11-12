@@ -1,0 +1,153 @@
+{
+  "date": "2026-11-04",
+  "baseline": "3adb416",
+  "method": "Agent-assisted live browser interaction through the in-app browser; real local Django server and isolated synthetic SQLite database. Not an independent participant study.",
+  "origins": {
+    "staff": "http://127.0.0.1:8773",
+    "hospital_then_donor": "http://localhost:8773"
+  },
+  "session_isolation": "Separate loopback host cookies; staff uttam and hospital abhinav were logged in simultaneously.",
+  "request_id": "REQ-E934D32BF7524B55A2C0560E16F2A34C",
+  "manifest_id": "MAN-20261104-6F05A7",
+  "checks": [
+    {
+      "check": "Live STAT alert without staff reload",
+      "result": "PASS observed",
+      "before": "Hidden alert; 0 pending requests; staff queue empty.",
+      "action": "Hospital submits B+ RBC quantity 2, required-by 6 November, STAT checked.",
+      "after": "Staff unchanged page shows 1 pending Emergency / STAT request require review.",
+      "first_observation_ms_since_submission_click": 1145,
+      "first_observation_hidden": true,
+      "visible_observation_ms_since_submission_click": 5527,
+      "timing_limit": "Observation upper bound includes control/inspection overhead, not exact network-to-paint latency or a strict <=5s measurement.",
+      "queue_note": "Alert updates live; table rows remain static until Open review queue is clicked. Link then shows the request."
+    },
+    {
+      "check": "Keyboard controls and review validation",
+      "result": "PASS sampled actions",
+      "observed": "b/Enter selects B+; r/Enter selects RBC. End selects Reject; submission without a reason shows A rejection reason is required and status stays Pending. Home selects Approve; Tab/Return records review and status Approved."
+    },
+    {
+      "check": "Cross-match, FEFO, partial dispatch and hospital receipt",
+      "result": "PASS observed",
+      "observed": "BAG-ABHINAV-01 compatible; earlier-expiry bag reserved and dispatched with manifest. Hospital Space/Tab/Return confirms receipt. Tracking shows Delivered with abhinav receiver/server timestamp; request stays Partially Fulfilled, 2 requested/1 dispatched, 1 remaining."
+    },
+    {
+      "check": "Browser logout",
+      "result": "PASS observed",
+      "observed": "Hospital logout returns home with success message and anonymous navigation."
+    },
+    {
+      "check": "Registration validation and corrected adult submission",
+      "result": "PASS observed",
+      "observed": "Synthetic Abhinav Navaneeth; 2015-01-01 DOB shows explicit under-age field error and preserves non-secret fields. Corrected 1999-01-01 DOB with re-entered password submits via Tab/Return and reaches donor dashboard. No first-time human timing claim."
+    },
+    {
+      "check": "Donor profile and empty history",
+      "result": "PASS observed",
+      "observed": "Profile edit stores synthetic address and B+ via keyboard selection/submit. History shows no previous donations and 90-day interval; medical screening remains separately required."
+    },
+    {
+      "check": "Quarantine and retained history",
+      "result": "PASS observed",
+      "observed": "Staff queue contains only BAG-UTTAM-UNSAFE, 1.0 days, count 1. Status History shows initial Quarantined event, uttam and server time."
+    }
+  ],
+  "contrast_method": "Read computed colors from rendered DOM and effective opaque background; sRGB relative luminance, alpha compositing before luminance. Sampled text pairs only, not a full WCAG audit.",
+  "contrast_reference": "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum",
+  "contrast_samples": [
+    {
+      "sample": "Registration label",
+      "foreground_rgb": [
+        33,
+        37,
+        41
+      ],
+      "foreground_alpha": 1,
+      "background_rgb": [
+        255,
+        255,
+        255
+      ],
+      "contrast_ratio": 15.4263,
+      "normal_text_threshold": 4.5,
+      "passes_sample": true
+    },
+    {
+      "sample": "Registration helper text",
+      "foreground_rgb": [
+        33,
+        37,
+        41
+      ],
+      "foreground_alpha": 0.75,
+      "background_rgb": [
+        255,
+        255,
+        255
+      ],
+      "contrast_ratio": 6.7811,
+      "normal_text_threshold": 4.5,
+      "passes_sample": true
+    },
+    {
+      "sample": "Under-age error / sign-in link",
+      "foreground_rgb": [
+        220,
+        53,
+        69
+      ],
+      "foreground_alpha": 1,
+      "background_rgb": [
+        255,
+        255,
+        255
+      ],
+      "contrast_ratio": 4.5275,
+      "normal_text_threshold": 4.5,
+      "passes_sample": true
+    },
+    {
+      "sample": "Create Donor Account button",
+      "foreground_rgb": [
+        255,
+        255,
+        255
+      ],
+      "foreground_alpha": 1,
+      "background_rgb": [
+        220,
+        53,
+        69
+      ],
+      "contrast_ratio": 4.5275,
+      "normal_text_threshold": 4.5,
+      "passes_sample": true
+    },
+    {
+      "sample": "STAT alert text / link",
+      "foreground_rgb": [
+        88,
+        21,
+        28
+      ],
+      "foreground_alpha": 1,
+      "background_rgb": [
+        248,
+        215,
+        218
+      ],
+      "contrast_ratio": 10.2171,
+      "normal_text_threshold": 4.5,
+      "passes_sample": true
+    }
+  ],
+  "not_verified": [
+    "Independent first-time usability participant",
+    "Complete keyboard/assistive-technology and all contrast states audit",
+    "Latest two Chrome/Firefox/Edge versions",
+    "Live deployed TLS",
+    "Scheduled uptime >=99%",
+    "PostgreSQL migration and concurrency"
+  ]
+}

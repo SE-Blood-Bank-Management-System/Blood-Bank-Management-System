@@ -1,0 +1,266 @@
+{
+  "method": "Supplementary same-laptop direct HTTP diagnostic; no agent browser and no cookies. One request then a synchronized burst of 50 anonymous clients. Not a replacement for authenticated-session acceptance workload.",
+  "url": "http://127.0.0.1:8773/availability/",
+  "single_anonymous_request": {
+    "status": 200,
+    "seconds": 0.09024300001328811,
+    "bytes": 10370
+  },
+  "anonymous_50_clients": {
+    "median_seconds": 0.6333257999795023,
+    "p95_seconds": 1.5834095000172965,
+    "max_seconds": 1.6048138000187464,
+    "results": [
+      {
+        "status": 200,
+        "seconds": 0.5644073000294156,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.6048138000187464,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.702336499991361,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.08308980002766475,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.5897017999668606,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.08612270001322031,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.19737490004627034,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.632635299989488,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.14292310003656894,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.06712709995917976,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.557662800012622,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.1428538000327535,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.2123351000482216,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.7106510000303388,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2105339999543503,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1026743999682367,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.6339235999621451,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1108929000329226,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.0769673999748193,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.1660435000085272,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.24387900001602247,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.5909613000112586,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.6327279999968596,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.1962556000216864,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.151215800025966,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1174501000205055,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1852380000054836,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.651179900043644,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2618815000168979,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2517892000032589,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.6639620999922045,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.18107739998959,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.10438869998324662,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1599397999816574,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.147041000018362,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.5943848000024445,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.14297330001136288,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2684332999633625,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1989708000328392,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.6876451999996789,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2783583999844268,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.2705432999646291,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.18247719999635592,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.6914025000296533,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.5834095000172965,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.668482800014317,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.1643906999961473,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.5741211000131443,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 0.1827322999597527,
+        "bytes": 10370
+      },
+      {
+        "status": 200,
+        "seconds": 1.2018871000036597,
+        "bytes": 10370
+      }
+    ]
+  }
+}
