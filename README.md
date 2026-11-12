@@ -351,6 +351,23 @@ python manage.py verify_audit_integrity
 ```
 See [full security architecture and HTTPS deployment guide](docs/password-reset-and-security.md), [central tamper-evident audit log guide](docs/central-audit-log.md), and [system reports & CSV analytics guide](docs/reports-and-csv-analytics.md).
 
+---
+
+## 17. Software Test Plan (STP) Execution & Quality Reports (2nd–6th Nov 2026)
+
+All 41 test cases defined in the baseline **Software Test Plan (BBMS-TP-001)** were updated to incorporate Sprint 1 and Sprint 2 architectural enhancements and executed against the integrated system:
+- **Test Suite Results**: 421 tests passed out of 421 (100% pass rate, 0 failures, 0 errors).
+- **Application Code Coverage**: **83%** (exceeds the 60% requirement in **BBMS-NF-011**).
+- **Application Branch Coverage**: **79%** across 1,314 decision branches.
+- **Tamper-Evident Integrity**: 100% chain integrity verified via SHA-256 hash chaining.
+
+### Quality & Test Reports in `docs/`:
+- [Test Case Document (BBMS-TP-001-TC v2.0)](docs/test-case-document.md): Updated test case specifications, sprint change traceability, and complete 41-case execution matrix.
+- [Unit Test Report](docs/unit-test-report.md): Execution breakdown across all 6 applications (114 accounts, 28 appointments, 32 donors, 112 inventory, 87 requisitions, 48 core).
+- [System Validation Report](docs/system-validation-report.md): End-to-end donor and hospital workflow validation, security control verification (SR-001 to SR-008), and quality attribute benchmarks (NF-001 to NF-015).
+- [Code Coverage Report](docs/code-coverage-report.md): Statement-level metrics, per-file analysis, and NF-011 threshold evaluation.
+- [Branch Coverage Report](docs/branch-coverage-report.md): Decision-branch analysis covering lockout counters, rate limits, serology states, cross-matching overrides, and audit immutability.
+
 ## Deliverable 3: Abhinav's test-case contribution
 
 The final testing/documentation phase follows existing feature ownership; it does
